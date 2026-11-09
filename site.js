@@ -66,7 +66,7 @@
   const FUZZY = [
     [/מס.?\s*פני/, 'id'], [/תאריך.*פתיח|נפתח/, 'opened'], [/סטטוס/, 'status'], [/שם\s*(ה)?פונה|^פונה$/, 'name'],
     [/טלפון|נייד/, 'phone'], [/כתובת|רחוב|מיקום/, 'address'], [/מחלק/, 'department'], [/SLA/i, 'sla'],
-    [/תיאור/, 'description'], [/נושא/, 'subject'], [/גורם\s*מטפל/, 'handler'], [/מקור/, 'source'], [/מוקדן/, 'opener'],
+    [/תיאור/, 'description'], [/נושא|סיווג/, 'subject'], [/יעד/, 'due'], [/גורם\s*מטפל/, 'handler'], [/מקור/, 'source'], [/מוקדן/, 'opener'],
   ];
   function colKey(name) {
     name = clean(name);
@@ -76,6 +76,17 @@
     return hit ? hit[1] : null;
   }
   let lastDiag = null;
+
+  // "09/11/26 14:15", "09/11/2026", "2026-11-09 14:15" -> ms
+  function parseDate(s) {
+    let m = String(s).match(/(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})(?:\D+(\d{1,2}):(\d{2}))?/);
+    if (m) {
+      const y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+      return new Date(y, m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)).getTime();
+    }
+    m = String(s).match(/(\d{4})-(\d{2})-(\d{2})(?:\D+(\d{1,2}):(\d{2}))?/);
+    return m ? new Date(+m[1], m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)).getTime() : null;
+  }
 
   function parseRows(html, headers) {
     const doc = parser.parseFromString('<table>' + html + '</table>', 'text/html');
@@ -87,7 +98,10 @@
       [...tr.children].forEach((td, i) => {
         // Each cell carries its column name in title; header position is only a fallback
         // (on the phone the header row does not line up with the cells).
-        const key = colKey(td.getAttribute('title')) || colKey(td.getAttribute('data-title')) || colKey(headers[i]);
+        // A cell's own title wins; header position is used only when the cell has no title
+        // (in the phone layout the header row does not line up with the cells).
+        const own = clean(td.getAttribute('title') || td.getAttribute('data-title'));
+        const key = own ? colKey(own) : colKey(headers[i]);
         if (!key || key === 'id') return;
         if (key === 'sla') it.sla = slaOf(td);
         else if (key === 'status') {
@@ -101,6 +115,11 @@
           it.subject = clean(td.textContent).replace(/\s*\\\s*/g, '/');
         } else it[key] = clean(td.textContent);
       });
+      // The phone layout has no SLA column, only opened + due dates: SLA = share of the time used.
+      if (it.sla == null && it.opened && it.due) {
+        const o = parseDate(it.opened), d = parseDate(it.due);
+        if (o && d && d > o) it.sla = Math.round(((Date.now() - o) / (d - o)) * 100);
+      }
       return it;
     });
     const first = doc.querySelector('tr[id^="itemTr"]');
@@ -109,7 +128,7 @@
       lastDiag = {
         headers,
         cells: [...first.children].map((td, i) => ({
-          title: clean(td.getAttribute('title')), header: headers[i] || '', key: colKey(td.getAttribute('title')) || colKey(headers[i]) || '',
+          title: clean(td.getAttribute('title')), header: headers[i] || '', key: (clean(td.getAttribute('title')) ? colKey(td.getAttribute('title')) : colKey(headers[i])) || '',
           len: clean(td.textContent).length, tags: [...td.querySelectorAll('*')].slice(0, 4).map((e) => e.tagName.toLowerCase()).join(','),
         })),
       };
