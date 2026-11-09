@@ -3,6 +3,22 @@
 (function () {
   if (window.__moked) return;
 
+  // Bump on every change: an open site page swaps itself to a newer published copy.
+  const VERSION = '2026-11-09.4';
+  const SELF_URL = 'https://ash88193-cell.github.io/moked-app/site.js';
+  let checkedAt = 0;
+
+  async function newerSelf() {
+    if (Date.now() - checkedAt < 60000) return null;
+    checkedAt = Date.now();
+    try {
+      const r = await fetch(SELF_URL + '?t=' + Date.now(), { cache: 'no-store', credentials: 'omit' });
+      const code = r.ok ? await r.text() : '';
+      const m = code.match(/const VERSION = '([^']+)'/);
+      return code.includes('window.__moked') && m && m[1] !== VERSION ? code : null;
+    } catch (e) { return null; }
+  }
+
   const LIST_PAGE = '/ims/system/?view=custom&module=moked-list';
   const ITEMS_URL = '/ims/customs/moked-list/ajax.items.php';
   const parser = new DOMParser();
@@ -167,7 +183,7 @@
       items.push(...res.items);
       if (!res.items.length || (total !== null && items.length >= total)) break;
     }
-    return { total: total === null ? items.length : total, items, truncated: total !== null && items.length < total, diag: lastDiag };
+    return { total: total === null ? items.length : total, items, truncated: total !== null && items.length < total, diag: lastDiag, siteVersion: VERSION };
   }
 
   async function detail(id) {
@@ -264,6 +280,18 @@
   }
 
   async function run(reqId, method, args) {
+    if (method === 'list') {
+      const code = await newerSelf();
+      if (code) {
+        const old = window.__moked;
+        try {
+          delete window.__moked;
+          (0, eval)(code);
+          if (window.__moked && window.__moked.run !== run) return window.__moked.run(reqId, method, args);
+        } catch (e) {}
+        window.__moked = old;
+      }
+    }
     let out;
     try {
       const fn = { list, detail, options, status, prepareUpdate, referral }[method];
@@ -277,5 +305,5 @@
     return out;
   }
 
-  window.__moked = { run, list, detail, options, status, prepareUpdate, referral };
+  window.__moked = { run, list, detail, options, status, prepareUpdate, referral, version: VERSION };
 })();

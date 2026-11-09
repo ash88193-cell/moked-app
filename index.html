@@ -258,7 +258,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-09.3';
+const APP_VERSION = '2026-11-09.4';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -435,6 +435,8 @@ async function load() {
     state.total = f ? state.items.length : r.total;
     state.truncated = r.truncated;
     if (r.diag) state.diag = r.diag;
+    state.siteVersion = r.siteVersion || 'ישן';
+    $('appVersion').textContent = APP_VERSION + ' · רקע ' + state.siteVersion;
     state.selected.clear();
     render();
   } catch (e) {
