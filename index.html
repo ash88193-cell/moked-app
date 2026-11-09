@@ -224,6 +224,9 @@
     <button class="btn light" id="openSite">פתח</button></div>
   <div class="setting"><div>גרסת מסכים<small id="appVersion"></small></div>
     <button class="btn light" id="reloadApp">טען עדכון</button></div>
+  <div class="setting"><div>אבחון עמודות<small>מה הטלפון מקבל מהאתר (בלי פרטי תושבים)</small></div>
+    <button class="btn light" id="diagBtn">הצג</button></div>
+  <pre id="diagOut" class="hidden" style="direction:rtl;white-space:pre-wrap;font-size:12px;background:#F1F4F6;padding:8px;border-radius:8px"></pre>
   <div class="setting"><div>משתמש<small id="savedUser">—</small></div>
     <button class="btn light" id="logout" style="color:var(--bad)">התנתק</button></div>
 </div>
@@ -255,7 +258,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-09.1';
+const APP_VERSION = '2026-11-09.2';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -431,6 +434,7 @@ async function load() {
     state.items = f ? r.items.filter(f) : r.items;
     state.total = f ? state.items.length : r.total;
     state.truncated = r.truncated;
+    if (r.diag) state.diag = r.diag;
     state.selected.clear();
     render();
   } catch (e) {
@@ -694,6 +698,13 @@ $('checkNow').onclick = () => native('checkNow').then(() => {
 $('testNotify').onclick = () => native('testNotify').then(() => toast('נשלחה התראת בדיקה'));
 $('appVersion').textContent = APP_VERSION + (location.protocol === 'file:' ? ' (עותק מקומי – אין חיבור לשרת המסכים)' : '');
 $('reloadApp').onclick = () => location.reload();
+$('diagBtn').onclick = () => {
+  const d = state.diag, out = $('diagOut');
+  out.classList.remove('hidden');
+  out.textContent = !d ? 'אין נתונים – טען רשימה קודם' :
+    `כותרות: ${d.headers.length} · תאים: ${d.cells.length}\n` +
+    d.cells.map((c, i) => `${i}. title="${c.title}" | כותרת="${c.header}" → ${c.key || '?'} | אורך ${c.len}${c.tags ? ' | ' + c.tags : ''}`).join('\n');
+};
 $('openSite').onclick =() => { closeSheets(); native('showSite', { url: SITE }); };
 $('logout').onclick = async () => {
   if (!confirm('להתנתק ולמחוק את פרטי ההתחברות מהטלפון?')) return;

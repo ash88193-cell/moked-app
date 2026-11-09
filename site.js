@@ -62,6 +62,21 @@
     'מקור פניה': 'source', 'מוקדן': 'opener', 'תמונות ומסמכים?': 'files',
   };
 
+  // Loose matching for column names that differ between devices.
+  const FUZZY = [
+    [/מס.?\s*פני/, 'id'], [/תאריך.*פתיח|נפתח/, 'opened'], [/סטטוס/, 'status'], [/שם\s*(ה)?פונה|^פונה$/, 'name'],
+    [/טלפון|נייד/, 'phone'], [/כתובת|רחוב|מיקום/, 'address'], [/מחלק/, 'department'], [/SLA/i, 'sla'],
+    [/תיאור/, 'description'], [/נושא/, 'subject'], [/גורם\s*מטפל/, 'handler'], [/מקור/, 'source'], [/מוקדן/, 'opener'],
+  ];
+  function colKey(name) {
+    name = clean(name);
+    if (!name) return null;
+    if (COLS[name]) return COLS[name];
+    const hit = FUZZY.find(([re]) => re.test(name));
+    return hit ? hit[1] : null;
+  }
+  let lastDiag = null;
+
   function parseRows(html, headers) {
     const doc = parser.parseFromString('<table>' + html + '</table>', 'text/html');
     const total = doc.querySelector('#total_applications');
@@ -72,7 +87,7 @@
       [...tr.children].forEach((td, i) => {
         // Each cell carries its column name in title; header position is only a fallback
         // (on the phone the header row does not line up with the cells).
-        const key = COLS[clean(td.getAttribute('title'))] || COLS[headers[i]];
+        const key = colKey(td.getAttribute('title')) || colKey(td.getAttribute('data-title')) || colKey(headers[i]);
         if (!key || key === 'id') return;
         if (key === 'sla') it.sla = slaOf(td);
         else if (key === 'status') {
@@ -88,6 +103,17 @@
       });
       return it;
     });
+    const first = doc.querySelector('tr[id^="itemTr"]');
+    if (first) {
+      // What this device actually receives, for the diagnostics screen (no resident data: lengths only).
+      lastDiag = {
+        headers,
+        cells: [...first.children].map((td, i) => ({
+          title: clean(td.getAttribute('title')), header: headers[i] || '', key: colKey(td.getAttribute('title')) || colKey(headers[i]) || '',
+          len: clean(td.textContent).length, tags: [...td.querySelectorAll('*')].slice(0, 4).map((e) => e.tagName.toLowerCase()).join(','),
+        })),
+      };
+    }
     return { total: total ? parseInt(total.value, 10) : null, items, headers };
   }
 
@@ -122,7 +148,7 @@
       items.push(...res.items);
       if (!res.items.length || (total !== null && items.length >= total)) break;
     }
-    return { total: total === null ? items.length : total, items, truncated: total !== null && items.length < total };
+    return { total: total === null ? items.length : total, items, truncated: total !== null && items.length < total, diag: lastDiag };
   }
 
   async function detail(id) {
