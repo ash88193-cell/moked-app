@@ -4,7 +4,7 @@
   if (window.__moked) return;
 
   // Bump on every change: an open site page swaps itself to a newer published copy.
-  const VERSION = '2026-11-09.4';
+  const VERSION = '2026-11-09.5';
   const SELF_URL = 'https://ash88193-cell.github.io/moked-app/site.js';
   let checkedAt = 0;
 
@@ -131,6 +131,8 @@
           it.subject = clean(td.textContent).replace(/\s*\\\s*/g, '/');
         } else it[key] = clean(td.textContent);
       });
+      // The phone layout's "סיווג" starts with the department name ("מנהלי אזור"); drop it.
+      if (it.subject) it.subject = it.subject.replace(/^\s*מנהלי\s+א[וי]?זור[\s\-–>›»\/:|,]*/, '').trim() || it.subject;
       // The phone layout has no SLA column, only opened + due dates: SLA = share of the time used.
       if (it.sla == null && it.opened && it.due) {
         const o = parseDate(it.opened), d = parseDate(it.due);
