@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>פניות מוקד</title>
+<style>
+  :root {
+    --brand: #0F4C5C; --brand-2: #16697A; --accent: #F2B134; --bg: #F3F5F7; --card: #fff;
+    --text: #1B2430; --muted: #66707C; --line: #E3E7EB; --ok: #2E9E5B; --warn: #E8A317; --bad: #D64545;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, "Segoe UI", Roboto, Arial, sans-serif; font-size: 15px; }
+  button { font: inherit; cursor: pointer; }
+  input, select, textarea { font: inherit; color: inherit; }
+  .hidden { display: none !important; }
+
+  /* header */
+  header { position: sticky; top: 0; z-index: 5; background: var(--brand); color: #fff; padding: 12px 16px 10px; }
+  header .row { display: flex; align-items: center; gap: 8px; }
+  header h1 { font-size: 19px; margin: 0; flex: 1; }
+  header .sub { font-size: 12px; opacity: .8; margin-top: 2px; }
+  .icon-btn { background: rgba(255,255,255,.14); border: 0; color: #fff; width: 38px; height: 38px;
+    border-radius: 10px; font-size: 18px; display: grid; place-items: center; }
+
+  /* chips */
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px; scrollbar-width: none; background: var(--brand); }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff;
+    padding: 7px 13px; border-radius: 999px; font-size: 14px; white-space: nowrap; }
+  .chip.on { background: #fff; color: var(--brand); border-color: #fff; font-weight: 600; }
+
+  main { padding: 12px 16px 120px; }
+  .card { background: var(--card); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+
+  /* advanced filters */
+  .adv-toggle { display: flex; align-items: center; gap: 8px; width: 100%; background: var(--card); border: 0;
+    border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; color: var(--brand); font-weight: 600; }
+  .adv-toggle .count { background: var(--accent); color: #000; border-radius: 999px; padding: 0 8px; font-size: 12px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  label.f { display: block; font-size: 12px; color: var(--muted); }
+  label.f select, label.f input { display: block; width: 100%; margin-top: 3px; padding: 8px; border: 1px solid var(--line);
+    border-radius: 9px; background: #fff; }
+  .row-btns { display: flex; gap: 8px; margin-top: 10px; }
+  .btn { border: 0; border-radius: 10px; padding: 10px 14px; background: var(--brand); color: #fff; font-weight: 600; }
+  .btn.light { background: #E8EEF1; color: var(--brand); }
+  .btn.wa { background: #25D366; color: #fff; }
+  .btn.block { width: 100%; }
+  .search { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; margin-bottom: 10px; }
+
+  /* summary */
+  .summary h2 { font-size: 16px; margin: 0 0 6px; display: flex; align-items: baseline; gap: 8px; }
+  .summary h2 .big { font-size: 26px; color: var(--brand); }
+  .stats { display: flex; gap: 8px; margin: 6px 0 4px; }
+  .stat { flex: 1; text-align: center; border-radius: 10px; padding: 6px 4px; background: #F1F4F6; font-size: 12px; color: var(--muted); }
+  .stat b { display: block; font-size: 18px; color: var(--text); }
+  .stat.warn b { color: var(--warn); } .stat.bad b { color: var(--bad); }
+  .bars { margin-top: 8px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 4px 0; }
+  .bar-row .name { flex: 0 0 44%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-row .track { flex: 1; height: 8px; background: #EEF1F3; border-radius: 4px; overflow: hidden; }
+  .bar-row .fill { height: 100%; background: var(--brand-2); border-radius: 4px; }
+  .bar-row .n { width: 28px; text-align: left; color: var(--muted); }
+
+  /* case cards */
+  .case { position: relative; }
+  .case .top { display: flex; align-items: flex-start; gap: 8px; }
+  .case .subj { font-weight: 700; flex: 1; line-height: 1.3; }
+  .case .addr { color: var(--brand-2); margin-top: 4px; font-size: 14px; }
+  .case .desc { margin-top: 6px; line-height: 1.45; white-space: pre-wrap; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--muted); align-items: center; }
+  .status { padding: 2px 8px; border-radius: 6px; color: #fff; font-size: 12px; }
+  .sla { display: inline-flex; align-items: center; gap: 5px; }
+  .sla .t { width: 54px; height: 6px; border-radius: 3px; background: #EEF1F3; overflow: hidden; }
+  .sla .t i { display: block; height: 100%; }
+  .actions { display: flex; gap: 6px; margin-top: 10px; }
+  .actions button, .actions a { flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 9px; padding: 7px 4px;
+    font-size: 13px; color: var(--brand); text-decoration: none; text-align: center; }
+  .sel { width: 22px; height: 22px; accent-color: var(--brand); }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; }
+
+  /* bottom bar */
+  .bottom { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--line);
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); display: flex; gap: 8px; z-index: 6; }
+  .bottom .btn { flex: 1; }
+
+  /* sheets */
+  .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 10; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; background: #fff; border-radius: 18px 18px 0 0;
+    padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); max-height: 88vh; overflow: auto; }
+  .sheet h3 { margin: 0 0 10px; font-size: 17px; }
+  .sheet .grab { width: 40px; height: 4px; border-radius: 2px; background: #D5DADF; margin: 0 auto 10px; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .tg { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 11px; font-size: 13px; color: var(--muted); }
+  .tg.on { background: #E3F1F3; border-color: var(--brand-2); color: var(--brand); font-weight: 600; }
+  .tg.fixed { background: #F1F4F6; color: var(--muted); border-style: dashed; }
+  textarea.preview { width: 100%; min-height: 190px; border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+    background: #F7FAF8; line-height: 1.45; font-size: 14px; resize: vertical; }
+  .sheet .row-btns { flex-wrap: wrap; }
+  .sheet .row-btns .btn { flex: 1 1 45%; }
+  .setting { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); gap: 10px; }
+  .setting small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .switch { width: 46px; height: 26px; accent-color: var(--brand); }
+
+  /* login */
+  #login { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 24px; background: var(--brand); }
+  #login .box { background: #fff; border-radius: 18px; padding: 22px 18px; }
+  #login h1 { margin: 0 0 4px; color: var(--brand); font-size: 22px; }
+  #login p { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+  #login input[type=text], #login input[type=password] { width: 100%; padding: 12px; border: 1px solid var(--line);
+    border-radius: 11px; margin-bottom: 10px; font-size: 16px; }
+  #login .remember { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--muted); margin: 4px 0 14px; }
+  #login .err { color: var(--bad); font-size: 14px; margin-bottom: 10px; }
+  #login .link { background: none; border: 0; color: var(--brand-2); margin-top: 12px; width: 100%; font-size: 14px; }
+
+  .loading { text-align: center; padding: 30px; color: var(--muted); }
+  .spinner { width: 28px; height: 28px; border: 3px solid #D8E2E6; border-top-color: var(--brand); border-radius: 50%;
+    animation: spin .8s linear infinite; margin: 0 auto 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: #222; color: #fff;
+    padding: 10px 16px; border-radius: 10px; z-index: 20; font-size: 14px; max-width: 90vw; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- splash -->
+<div id="splash" class="loading" style="padding-top:40vh"><div class="spinner"></div>מתחבר למערכת המוקד…</div>
+
+<!-- login -->
+<section id="login" class="hidden">
+  <div class="box">
+    <h1>פניות מוקד</h1>
+    <p>התחברות עם המשתמש שלך במערכת המוקד</p>
+    <div id="loginErr" class="err hidden"></div>
+    <input id="user" type="text" placeholder="שם משתמש / דוא״ל" autocomplete="username" dir="ltr">
+    <input id="pass" type="password" placeholder="סיסמה" autocomplete="current-password" dir="ltr">
+    <label class="remember"><input id="remember" type="checkbox" checked>
+      <span>זכור אותי בטלפון הזה (מוצפן). נדרש כדי שהבדיקות וההתראות ברקע יעבדו גם כשהחיבור פג.</span></label>
+    <button id="loginBtn" class="btn block">התחבר</button>
+    <button id="siteLogin" class="link">להתחבר ישירות דרך האתר</button>
+  </div>
+</section>
+
+<!-- main -->
+<section id="app" class="hidden">
+  <header>
+    <div class="row">
+      <h1>פניות מוקד</h1>
+      <button class="icon-btn" id="refreshBtn" title="רענון">⟳</button>
+      <button class="icon-btn" id="settingsBtn" title="הגדרות">⚙</button>
+    </div>
+    <div class="sub" id="lastCheck"></div>
+  </header>
+  <div class="chips" id="quick"></div>
+
+  <main>
+    <button class="adv-toggle" id="advToggle">⛃ סינון מתקדם <span class="count hidden" id="advCount"></span>
+      <span style="flex:1"></span><span id="advArrow">▾</span></button>
+    <div class="card hidden" id="adv">
+      <div class="grid2">
+        <label class="f">נושא<select id="fSubject"></select></label>
+        <label class="f">שכונה<select id="fHood"></select></label>
+        <label class="f">סטטוס<select id="fStatus"></select></label>
+        <label class="f">מקור<select id="fSource"></select></label>
+        <label class="f">מתאריך<input type="date" id="fFrom"></label>
+        <label class="f">עד תאריך<input type="date" id="fTo"></label>
+      </div>
+      <div class="row-btns">
+        <button class="btn" id="advApply">סנן</button>
+        <button class="btn light" id="advClear">נקה</button>
+      </div>
+    </div>
+
+    <input class="search" id="search" type="search" placeholder="חיפוש חופשי: רחוב, נושא, תיאור…">
+
+    <div id="summary" class="card summary hidden"></div>
+    <div id="listTools" class="hidden" style="display:flex;align-items:center;gap:8px;margin:4px 0 8px">
+      <button class="tg" id="selectMode">בחירת פניות לשיתוף</button>
+      <span id="selInfo" style="font-size:13px;color:var(--muted)"></span>
+      <span style="flex:1"></span>
+      <select id="sort" class="tg" style="padding:5px 8px">
+        <option value="new">חדשות קודם</option>
+        <option value="sla">SLA גבוה קודם</option>
+        <option value="subject">לפי נושא</option>
+      </select>
+    </div>
+    <div id="list"></div>
+  </main>
+
+  <div class="bottom">
+    <button class="btn wa" id="shareBtn">שיתוף לוואטסאפ</button>
+  </div>
+</section>
+
+<!-- share sheet -->
+<div id="shareBackdrop" class="backdrop hidden"></div>
+<div id="shareSheet" class="sheet hidden">
+  <div class="grab"></div>
+  <h3 id="shareTitle">שיתוף</h3>
+  <div class="toggles" id="fieldToggles"></div>
+  <textarea class="preview" id="preview"></textarea>
+  <div class="row-btns">
+    <button class="btn wa" data-img="none">שלח טקסט</button>
+    <button class="btn wa" data-img="camera">📷 צלם וצרף</button>
+    <button class="btn wa" data-img="gallery">🖼 צרף מהגלריה</button>
+    <button class="btn light" id="copyBtn">העתק</button>
+  </div>
+</div>
+
+<!-- settings sheet -->
+<div id="setBackdrop" class="backdrop hidden"></div>
+<div id="setSheet" class="sheet hidden">
+  <div class="grab"></div>
+  <h3>הגדרות</h3>
+  <div class="setting"><div>התראות ברקע<small id="slotsInfo"></small></div>
+    <input type="checkbox" class="switch" id="notifyToggle"></div>
+  <div class="setting"><div>בדיקה אחרונה<small id="lastCheckFull">—</small></div>
+    <button class="btn light" id="checkNow">בדוק עכשיו</button></div>
+  <div class="setting"><div>בדיקת התראה<small>שולח התראה לדוגמה לטלפון</small></div>
+    <button class="btn light" id="testNotify">שלח</button></div>
+  <div class="setting"><div>פתיחת האתר המלא<small>מערכת המוקד בתוך האפליקציה</small></div>
+    <button class="btn light" id="openSite">פתח</button></div>
+  <div class="setting"><div>גרסת מסכים<small id="appVersion"></small></div>
+    <button class="btn light" id="reloadApp">טען עדכון</button></div>
+  <div class="setting"><div>משתמש<small id="savedUser">—</small></div>
+    <button class="btn light" id="logout" style="color:var(--bad)">התנתק</button></div>
+</div>
+
+<!-- close sheet -->
+<div id="closeBackdrop" class="backdrop hidden"></div>
+<div id="closeSheet" class="sheet hidden">
+  <div class="grab"></div>
+  <h3 id="closeTitle">סגירת פנייה</h3>
+  <div id="closeCase" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
+  <div class="toggles" id="closeStatuses"></div>
+  <label class="f">תיאור הטיפול
+    <textarea class="preview" id="closeText" style="min-height:90px" placeholder="מה בוצע במקום…"></textarea></label>
+  <div style="display:flex;align-items:center;gap:10px;margin:10px 0">
+    <img id="closePhoto" class="hidden" style="width:64px;height:64px;object-fit:cover;border-radius:10px">
+    <span id="closePhotoInfo" style="font-size:13px;color:var(--bad)">חובה לצרף תמונה</span>
+  </div>
+  <div class="row-btns">
+    <button class="btn light" data-photo="camera">📷 צלם</button>
+    <button class="btn light" data-photo="gallery">🖼 מהגלריה</button>
+    <button class="btn block" id="closeGo" style="flex-basis:100%">המשך לאישור באתר</button>
+  </div>
+  <div style="font-size:12px;color:var(--muted);margin-top:8px">הטופס של האתר ייפתח מלא. הסגירה מתבצעת רק כשתלחץ "עדכן פרטים" באתר.</div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
+const APP_VERSION = '2026-11-09.1';
+
+/* ---------- native bridge ---------- */
+const pending = {}; let seq = 0;
+function native(method, args) {
+  return new Promise((resolve, reject) => {
+    const id = ++seq; pending[id] = { resolve, reject };
+    Native.call(id, method, JSON.stringify(args === undefined ? null : args));
+  });
+}
+window.onNative = (id, json) => {
+  const p = pending[id]; if (!p) return; delete pending[id];
+  const r = JSON.parse(json);
+  r.ok ? p.resolve(r.data) : p.reject(r);
+};
+
+function toast(msg, ms = 2600) {
+  const t = $('toast'); t.textContent = msg; t.classList.remove('hidden');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.add('hidden'), ms);
+}
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const daysAgo = (n) => iso(new Date(Date.now() - n * 864e5));
+const cleanAddr = (a) => (a || '').replace(/,\s*[^,()]*-{2,}[^,()]*/g, '').replace(/\s*\(/, ' (').trim();
+
+function show(view) {
+  for (const v of ['splash', 'login', 'app']) $(v).classList.toggle('hidden', v !== view);
+}
+
+/* ---------- state ---------- */
+const QUICK = {
+  open:       { label: 'פתוחות',         params: () => ({ status: ['-1'] }) },
+  today:      { label: 'נפתחו היום',     params: () => ({ status: [], dateStart: daysAgo(0) }) },
+  sla80:      { label: 'SLA מעל 80%',    params: () => ({ status: ['-1'] }), filter: (i) => i.sla >= 80 },
+  sla100:     { label: 'חרגו מה-SLA',    params: () => ({ status: ['-1'] }), filter: (i) => i.sla >= 100 },
+  week:       { label: 'נפתחו השבוע',    params: () => ({ status: [], dateStart: daysAgo(7) }) },
+  closedWeek: { label: 'נסגרו השבוע',    params: () => ({ status: ['-2'], dateStart_close: daysAgo(7) }) },
+};
+const FIELDS = [
+  { k: 'id', t: "מס' פנייה" }, { k: 'status', t: 'סטטוס' }, { k: 'date', t: 'תאריך' },
+  { k: 'sla', t: 'SLA' }, { k: 'department', t: 'מחלקה' }, { k: 'resident', t: 'שם וטלפון פונה' },
+  { k: 'summary', t: 'סיכום לפי נושא' },
+];
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const state = {
+  quick: store.get('quick', 'open'),
+  adv: {},
+  items: [], total: 0, truncated: false,
+  selectMode: false, selected: new Set(),
+  fields: store.get('fields', { id: true, summary: true }),
+  options: null, shareItems: [], shareTitle: '',
+};
+
+/* ---------- startup / login ---------- */
+async function start() {
+  show('splash');
+  try {
+    const s = await native('start');
+    if (s.savedUser) $('user').value = s.savedUser;
+    if (s.loggedIn) return enterApp();
+    show('login');
+    if (s.needsUser) {
+      native('showSite', { url: SITE });
+      toast('השלם את שלב האימות באתר ולחץ "חזרה לאפליקציה"', 5000);
+    }
+  } catch (e) {
+    show('login'); loginError('לא ניתן להגיע למערכת המוקד. בדוק חיבור לאינטרנט.');
+  }
+}
+function loginError(msg) { const el = $('loginErr'); el.textContent = msg || ''; el.classList.toggle('hidden', !msg); }
+
+$('loginBtn').onclick = async () => {
+  const user = $('user').value.trim(), pass = $('pass').value;
+  if (!user || !pass) return loginError('צריך למלא שם משתמש וסיסמה');
+  loginError(''); $('loginBtn').disabled = true; $('loginBtn').textContent = 'מתחבר…';
+  try {
+    const r = await native('login', { user, pass, remember: $('remember').checked });
+    if (r.result === 'ok') { $('pass').value = ''; enterApp(); }
+    else if (r.result === 'needsUser') toast('השלם את שלב האימות באתר ולחץ "חזרה לאפליקציה"', 5000);
+    else loginError(r.message);
+  } catch (e) { loginError(e.error || 'ההתחברות נכשלה'); }
+  finally { $('loginBtn').disabled = false; $('loginBtn').textContent = 'התחבר'; }
+};
+$('siteLogin').onclick = () => native('showSite', { url: SITE });
+
+// After the user was in the site view (verification step / manual login), re-check the session.
+window.onSiteClosed = async () => {
+  if (!$('app').classList.contains('hidden')) {
+    if (state.reloadOnReturn) { state.reloadOnReturn = false; load(); }
+    return;
+  }
+  try { const s = await native('status'); if (s.loggedIn) enterApp(); } catch {}
+};
+
+let entered = false;
+async function enterApp() {
+  show('app');
+  if (!entered) {
+    entered = true;
+    renderQuick();
+    loadSettings();
+    native('options').then((o) => { state.options = o; fillAdvanced(); }).catch(() => {});
+  }
+  load();
+}
+
+/* ---------- quick filters ---------- */
+function renderQuick() {
+  $('quick').innerHTML = Object.entries(QUICK).map(([k, q]) =>
+    `<button class="chip ${k === state.quick ? 'on' : ''}" data-k="${k}">${q.label}</button>`).join('');
+  $('quick').querySelectorAll('.chip').forEach((b) => b.onclick = () => {
+    state.quick = b.dataset.k; store.set('quick', state.quick); renderQuick(); load();
+  });
+}
+
+/* ---------- advanced filters ---------- */
+function opt(list, all) {
+  return `<option value="">${all}</option>` +
+    (list || []).map((o) => `<option value="${esc(o.v)}">${esc(o.t)}</option>`).join('');
+}
+function fillAdvanced() {
+  const o = state.options || {};
+  $('fSubject').innerHTML = opt(o.subSubject, 'כל הנושאים');
+  $('fHood').innerHTML = opt(o.neighborhood, 'כל השכונות');
+  $('fStatus').innerHTML = opt(o.status, 'כל הסטטוסים');
+  $('fSource').innerHTML = opt(o.source, 'כל המקורות');
+}
+$('advToggle').onclick = () => {
+  const open = $('adv').classList.toggle('hidden');
+  $('advArrow').textContent = open ? '▾' : '▴';
+};
+$('advApply').onclick = () => {
+  state.adv = {
+    subSubject: $('fSubject').value, neighborhood: $('fHood').value, status: $('fStatus').value,
+    source: $('fSource').value, from: $('fFrom').value, to: $('fTo').value,
+  };
+  updateAdvCount(); $('adv').classList.add('hidden'); $('advArrow').textContent = '▾'; load();
+};
+$('advClear').onclick = () => {
+  ['fSubject', 'fHood', 'fStatus', 'fSource', 'fFrom', 'fTo'].forEach((id) => $(id).value = '');
+  state.adv = {}; updateAdvCount(); load();
+};
+function updateAdvCount() {
+  const n = Object.values(state.adv).filter(Boolean).length;
+  $('advCount').textContent = n; $('advCount').classList.toggle('hidden', !n);
+}
+
+function buildParams() {
+  const q = QUICK[state.quick] || QUICK.open;
+  const p = q.params();
+  const a = state.adv;
+  if (a.status) p.status = [a.status];
+  if (a.subSubject) p.subSubject = [a.subSubject];
+  if (a.neighborhood) p.neighborhood = [a.neighborhood];
+  if (a.source) p.source = [a.source];
+  if (a.from) p.dateStart = a.from;
+  if (a.to) p.dateEnd = a.to;
+  return p;
+}
+
+/* ---------- loading ---------- */
+let loadSeq = 0;
+async function load() {
+  const my = ++loadSeq;
+  $('list').innerHTML = '<div class="loading"><div class="spinner"></div>טוען פניות…</div>';
+  $('summary').classList.add('hidden'); $('listTools').classList.add('hidden');
+  try {
+    const r = await native('list', buildParams());
+    if (my !== loadSeq) return;
+    const f = (QUICK[state.quick] || {}).filter;
+    state.items = f ? r.items.filter(f) : r.items;
+    state.total = f ? state.items.length : r.total;
+    state.truncated = r.truncated;
+    state.selected.clear();
+    render();
+  } catch (e) {
+    if (my !== loadSeq) return;
+    if (e.auth) { toast('החיבור למערכת פג – מתחבר מחדש…'); entered = false; return start(); }
+    $('list').innerHTML = `<div class="empty">שגיאה בטעינה: ${esc(e.error || '')}<br><br>
+      <button class="btn light" onclick="load()">נסה שוב</button></div>`;
+  }
+}
+$('refreshBtn').onclick = () => load();
+
+/* ---------- rendering ---------- */
+function visibleItems() {
+  const q = $('search').value.trim();
+  let items = state.items;
+  if (q) {
+    const words = q.split(/\s+/);
+    items = items.filter((i) => {
+      const hay = [i.id, i.subject, i.address, i.description, i.status, i.name, i.department].join(' ');
+      return words.every((w) => hay.includes(w));
+    });
+  }
+  const sort = $('sort').value;
+  const parseDate = (s) => { const m = (s || '').match(/(\d+)\/(\d+)\/(\d+)\s*(\d+)?:?(\d+)?/);
+    return m ? new Date(2000 + +m[3] % 100, m[2] - 1, m[1], m[4] || 0, m[5] || 0).getTime() : 0; };
+  items = [...items];
+  if (sort === 'sla') items.sort((a, b) => (b.sla ?? -1) - (a.sla ?? -1));
+  else if (sort === 'subject') items.sort((a, b) => (a.subject || '').localeCompare(b.subject || '', 'he'));
+  else items.sort((a, b) => parseDate(b.opened) - parseDate(a.opened) || b.id - a.id);
+  return items;
+}
+
+function countBy(items, key) {
+  const m = new Map();
+  for (const i of items) { const k = i[key] || 'ללא'; m.set(k, (m.get(k) || 0) + 1); }
+  return [...m.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+function slaColor(v) { return v >= 100 ? 'var(--bad)' : v >= 80 ? 'var(--warn)' : 'var(--ok)'; }
+
+function render() {
+  const items = visibleItems();
+  const title = currentTitle();
+
+  // summary
+  const sla80 = items.filter((i) => i.sla >= 80 && i.sla < 100).length;
+  const sla100 = items.filter((i) => i.sla >= 100).length;
+  const bySubj = countBy(items, 'subject').slice(0, 6);
+  const max = bySubj.length ? bySubj[0][1] : 1;
+  const byStatus = countBy(items, 'status');
+  $('summary').innerHTML = `
+    <h2><span class="big">${items.length}</span> ${esc(title)}</h2>
+    ${state.truncated ? `<div style="font-size:12px;color:var(--muted)">מוצגות ${state.items.length} מתוך ${state.total}</div>` : ''}
+    <div class="stats">
+      <div class="stat warn"><b>${sla80}</b>SLA 80%+</div>
+      <div class="stat bad"><b>${sla100}</b>חרגו</div>
+      <div class="stat"><b>${byStatus.length}</b>סטטוסים</div>
+    </div>
+    <div class="bars">${bySubj.map(([k, n]) => `
+      <div class="bar-row"><span class="name">${esc(k)}</span>
+        <span class="track"><span class="fill" style="width:${Math.round(n / max * 100)}%;display:block"></span></span>
+        <span class="n">${n}</span></div>`).join('')}</div>
+    ${byStatus.length > 1 ? `<div class="meta">${byStatus.map(([k, n]) => `<span>${esc(k)}: <b>${n}</b></span>`).join(' · ')}</div>` : ''}`;
+  $('summary').classList.toggle('hidden', !items.length);
+  $('listTools').classList.toggle('hidden', !items.length);
+  $('listTools').style.display = items.length ? 'flex' : '';
+
+  if (!items.length) { $('list').innerHTML = '<div class="empty">אין פניות להצגה 🎉</div>'; updateSel(); return; }
+
+  $('list').innerHTML = items.map((i) => `
+    <div class="card case" data-id="${esc(i.id)}">
+      <div class="top">
+        ${state.selectMode ? `<input type="checkbox" class="sel" data-id="${esc(i.id)}" ${state.selected.has(i.id) ? 'checked' : ''}>` : ''}
+        <div class="subj">${esc(i.subject || 'ללא נושא')}</div>
+      </div>
+      <div class="addr">📍 ${esc(cleanAddr(i.address) || 'ללא כתובת')}</div>
+      ${i.description ? `<div class="desc">${esc(i.description)}</div>` : ''}
+      <div class="meta">
+        <span class="status" style="background:${esc(i.statusColor || '#64AFFA')}">${esc(i.status)}</span>
+        <span>#${esc(i.id)}</span><span>${esc(i.opened || '')}</span>
+        ${i.sla != null ? `<span class="sla"><span class="t"><i style="width:${Math.min(100, i.sla)}%;background:${slaColor(i.sla)}"></i></span>${Math.round(i.sla)}%</span>` : ''}
+      </div>
+      <div class="actions">
+        <button data-act="share">שיתוף</button>
+        <button data-act="open">פתח באתר</button>
+        ${state.quick !== 'closedWeek' ? '<button data-act="close">✔ סגירה</button>' : ''}
+        ${i.phone ? `<a href="tel:${esc(i.phone)}">📞 חייג</a>` : ''}
+      </div>
+    </div>`).join('');
+
+  $('list').querySelectorAll('.case').forEach((el) => {
+    const it = state.items.find((x) => x.id === el.dataset.id);
+    el.querySelector('[data-act=share]').onclick = () => openShare([it], `פנייה ${it.id}`);
+    el.querySelector('[data-act=open]').onclick = () =>
+      native('showSite', { url: SITE + '?view=custom&module=moked-page&id=' + encodeURIComponent(it.id) });
+    const cl = el.querySelector('[data-act=close]');
+    if (cl) cl.onclick = () => openClose(it);
+    const cb = el.querySelector('.sel');
+    if (cb) cb.onchange = () => { cb.checked ? state.selected.add(it.id) : state.selected.delete(it.id); updateSel(); };
+  });
+  updateSel();
+}
+
+function currentTitle() {
+  const a = state.adv, o = state.options || {};
+  const name = (list, v) => ((list || []).find((x) => x.v === v) || {}).t;
+  let t = (QUICK[state.quick] || QUICK.open).label;
+  if (a.status) t = name(o.status, a.status) || t;
+  const extra = [name(o.subSubject, a.subSubject), name(o.neighborhood, a.neighborhood)].filter(Boolean);
+  return 'פניות ' + t + (extra.length ? ' – ' + extra.join(', ') : '');
+}
+
+$('search').oninput = () => render();
+$('sort').onchange = () => render();
+$('selectMode').onclick = () => {
+  state.selectMode = !state.selectMode; state.selected.clear();
+  $('selectMode').classList.toggle('on', state.selectMode); render();
+};
+function updateSel() {
+  $('selInfo').textContent = state.selectMode ? `נבחרו ${state.selected.size}` : '';
+  $('shareBtn').textContent = state.selectMode && state.selected.size
+    ? `שיתוף ${state.selected.size} פניות לוואטסאפ` : 'שיתוף לוואטסאפ';
+}
+
+/* ---------- share ---------- */
+$('shareBtn').onclick = () => {
+  const vis = visibleItems();
+  const items = state.selectMode && state.selected.size ? vis.filter((i) => state.selected.has(i.id)) : vis;
+  if (!items.length) return toast('אין פניות לשיתוף');
+  openShare(items, currentTitle());
+};
+
+function buildMessage(items, title) {
+  const f = state.fields, L = [];
+  const multi = items.length > 1;
+  if (multi) L.push(`*${title} – ${items.length}*`, '');
+  if (multi && f.summary) {
+    L.push('לפי נושא: ' + countBy(items, 'subject').map(([k, n]) => `${k} (${n})`).join(', '), '');
+  }
+  items.forEach((it, n) => {
+    L.push(`${multi ? (n + 1) + '. ' : ''}*${it.subject || 'ללא נושא'}*`);
+    L.push(`📍 ${cleanAddr(it.address) || 'ללא כתובת'}`);
+    if (it.description) L.push(`📝 ${it.description}`);
+    const ex = [];
+    if (f.id) ex.push(`פנייה ${it.id}`);
+    if (f.status && it.status) ex.push(it.status);
+    if (f.date && it.opened) ex.push(it.opened);
+    if (f.sla && it.sla != null) ex.push(`SLA ${Math.round(it.sla)}%`);
+    if (f.department && it.department) ex.push(it.department);
+    if (ex.length) L.push(ex.join(' · '));
+    if (f.resident) { const r = [it.name, it.phone].filter(Boolean).join(' '); if (r) L.push(`👤 ${r}`); }
+    L.push('');
+  });
+  return L.join('\n').trim();
+}
+
+function openShare(items, title) {
+  state.shareItems = items; state.shareTitle = title;
+  $('shareTitle').textContent = items.length > 1 ? `שיתוף ${items.length} פניות` : `שיתוף ${title}`;
+  renderToggles();
+  $('preview').value = buildMessage(items, title);
+  $('shareBackdrop').classList.remove('hidden'); $('shareSheet').classList.remove('hidden');
+}
+function renderToggles() {
+  const fixed = ['נושא', 'כתובת', 'תיאור'].map((t) => `<span class="tg fixed">✓ ${t}</span>`).join('');
+  $('fieldToggles').innerHTML = fixed + FIELDS
+    .filter((x) => x.k !== 'summary' || state.shareItems.length > 1)
+    .map((x) => `<button class="tg ${state.fields[x.k] ? 'on' : ''}" data-k="${x.k}">${state.fields[x.k] ? '✓ ' : '+ '}${x.t}</button>`).join('');
+  $('fieldToggles').querySelectorAll('button.tg').forEach((b) => b.onclick = () => {
+    state.fields[b.dataset.k] = !state.fields[b.dataset.k]; store.set('fields', state.fields);
+    renderToggles(); $('preview').value = buildMessage(state.shareItems, state.shareTitle);
+  });
+}
+function closeSheets() {
+  ['shareBackdrop', 'shareSheet', 'setBackdrop', 'setSheet', 'closeBackdrop', 'closeSheet']
+    .forEach((id) => $(id).classList.add('hidden'));
+}
+
+/* ---------- close a case (fills the site's own form; the user presses send on the site) ---------- */
+const CLOSE_STATUSES = [
+  { v: '30', t: 'סגורה' }, { v: '29', t: 'לא נמצאה בעיה במקום' },
+  { v: '35', t: 'החלטות עקרוניות' }, { v: '33', t: 'נכנס לתכנית עבודה' },
+];
+const closeState = { it: null, status: '30', hasPhoto: false };
+function openClose(it) {
+  Object.assign(closeState, { it, status: '30', hasPhoto: false });
+  $('closeTitle').textContent = `סגירת פנייה ${it.id}`;
+  $('closeCase').textContent = [it.subject, cleanAddr(it.address)].filter(Boolean).join(' · ');
+  $('closeText').value = '';
+  $('closePhoto').classList.add('hidden');
+  $('closePhotoInfo').textContent = 'חובה לצרף תמונה'; $('closePhotoInfo').style.color = 'var(--bad)';
+  renderCloseStatuses();
+  $('closeBackdrop').classList.remove('hidden'); $('closeSheet').classList.remove('hidden');
+}
+function renderCloseStatuses() {
+  $('closeStatuses').innerHTML = CLOSE_STATUSES.map((s) =>
+    `<button class="tg ${s.v === closeState.status ? 'on' : ''}" data-v="${s.v}">${s.t}</button>`).join('');
+  $('closeStatuses').querySelectorAll('button').forEach((b) => b.onclick = () => {
+    closeState.status = b.dataset.v; renderCloseStatuses();
+  });
+}
+$('closeBackdrop').onclick = closeSheets;
+$('closeSheet').querySelectorAll('[data-photo]').forEach((b) => b.onclick = async () => {
+  try {
+    const r = await native('pickPhoto', { source: b.dataset.photo });
+    if (!r || !r.thumb) return;
+    closeState.hasPhoto = true;
+    $('closePhoto').src = r.thumb; $('closePhoto').classList.remove('hidden');
+    $('closePhotoInfo').textContent = 'תמונה צורפה'; $('closePhotoInfo').style.color = 'var(--ok, #1a7f37)';
+  } catch (e) { toast(e.error || 'לא ניתן לצרף תמונה'); }
+});
+$('closeGo').onclick = async () => {
+  if (!closeState.hasPhoto) return toast('חובה לצרף תמונה כדי לסגור');
+  const btn = $('closeGo'); btn.disabled = true; btn.textContent = 'פותח את הטופס באתר…';
+  try {
+    await native('closeCase', { id: closeState.it.id, status: closeState.status, text: $('closeText').value.trim() });
+    closeSheets(); state.reloadOnReturn = true;
+    toast('בדוק את הטופס ולחץ "עדכן פרטים" באתר', 5000);
+  } catch (e) {
+    if (e.auth) { closeSheets(); toast('החיבור למערכת פג – מתחבר מחדש…'); entered = false; return start(); }
+    toast(e.error || 'פתיחת הטופס נכשלה', 4000);
+  } finally { btn.disabled = false; btn.textContent = 'המשך לאישור באתר'; }
+};
+$('shareBackdrop').onclick = closeSheets;
+$('setBackdrop').onclick = closeSheets;
+$('shareSheet').querySelectorAll('[data-img]').forEach((b) => b.onclick = () => {
+  native('share', { text: $('preview').value, images: b.dataset.img }).catch((e) => toast(e.error || 'שגיאה'));
+  closeSheets();
+});
+$('copyBtn').onclick = () => native('copy', { text: $('preview').value }).then(() => toast('הטקסט הועתק'));
+
+window.onBack = () => {
+  if (['shareSheet', 'setSheet', 'closeSheet'].some((id) => !$(id).classList.contains('hidden'))) { closeSheets(); return true; }
+  if (!$('adv').classList.contains('hidden')) { $('adv').classList.add('hidden'); return true; }
+  return false;
+};
+
+/* ---------- settings ---------- */
+function fmtTime(ms) {
+  if (!ms) return '';
+  const d = new Date(ms);
+  return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' }) + ' ' +
+    d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+}
+async function loadSettings() {
+  try {
+    const s = await native('settings');
+    $('notifyToggle').checked = s.notify;
+    $('slotsInfo').textContent = `בדיקה בשעות ${s.slots}. בין 16:00 ל-06:00 ההתראה מגיעה בשקט.`;
+    $('lastCheckFull').textContent = s.lastCheckAt ? `${fmtTime(s.lastCheckAt)} – ${s.lastCheckMsg}` : 'עוד לא בוצעה בדיקה';
+    $('lastCheck').textContent = s.lastCheckAt ? `בדיקה ברקע: ${fmtTime(s.lastCheckAt)} · ${s.lastCheckMsg}` : '';
+    $('savedUser').textContent = s.savedUser ? `${s.savedUser} (שמור בטלפון)` : 'לא נשמרו פרטי התחברות';
+  } catch {}
+}
+$('settingsBtn').onclick = () => { loadSettings(); $('setBackdrop').classList.remove('hidden'); $('setSheet').classList.remove('hidden'); };
+$('notifyToggle').onchange = () => native('setNotify', { on: $('notifyToggle').checked })
+  .then(() => toast($('notifyToggle').checked ? 'ההתראות הופעלו' : 'ההתראות כובו'));
+$('checkNow').onclick = () => native('checkNow').then(() => {
+  toast('הבדיקה רצה ברקע – התוצאה תופיע תוך דקה'); setTimeout(loadSettings, 30000);
+});
+$('testNotify').onclick = () => native('testNotify').then(() => toast('נשלחה התראת בדיקה'));
+$('appVersion').textContent = APP_VERSION + (location.protocol === 'file:' ? ' (עותק מקומי – אין חיבור לשרת המסכים)' : '');
+$('reloadApp').onclick = () => location.reload();
+$('openSite').onclick =() => { closeSheets(); native('showSite', { url: SITE }); };
+$('logout').onclick = async () => {
+  if (!confirm('להתנתק ולמחוק את פרטי ההתחברות מהטלפון?')) return;
+  closeSheets(); await native('logout').catch(() => {});
+  entered = false; $('user').value = ''; show('login');
+};
+
+start();
+</script>
+</body>
+</html>
