@@ -258,7 +258,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-19.4';
+const APP_VERSION = '2026-11-19.5';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -517,7 +517,9 @@ function render() {
     </div>
     <div style="font-size:12px;color:var(--muted);margin:-4px 0 8px">מיום ראשון ${esc(lastSunday().split('-').reverse().join('/'))} 00:00 ועד עכשיו${state.flow.before ? ` · כולל ${state.flow.before} שנפתחו לפני ראשון ונסגרו השבוע` : ''}</div>` : ''}
     <div class="stats">
-      <div class="stat" style="color:var(--ok)"><b>${items.filter((i) => i.sla != null && i.sla < 80).length}</b>בזמן</div>
+      ${(() => { const v = items.filter((i) => i.sla != null).map((i) => i.sla);
+        const avg = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+        return `<div class="stat" style="color:${avg == null ? 'inherit' : slaColor(avg)}"><b>${avg == null ? '–' : avg + '%'}</b>ממוצע SLA</div>`; })()}
       <div class="stat warn"><b>${sla80}</b>SLA 80%+</div>
       <div class="stat bad"><b>${sla100}</b>חרגו</div>
     </div>
