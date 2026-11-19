@@ -258,7 +258,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-19.2';
+const APP_VERSION = '2026-11-19.3';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -296,6 +296,9 @@ const QUICK = {
   sla100:     { label: 'חרגו מה-SLA',    params: () => ({ status: ['-1'] }), filter: (i) => i.sla >= 100 },
   week:       { label: 'נפתחו השבוע',    params: () => ({ status: [], dateStart: daysAgo(7) }) },
   closedWeek: { label: 'נסגרו השבוע',    params: () => ({ status: ['-2'], dateStart_close: lastSunday() }) },
+  // Two lists since Sunday 00:00: everything opened, and everything closed. Shown together with both counts.
+  weekFlow:   { label: 'נפתחו ונסגרו השבוע', params: () => ({ status: [], dateStart: lastSunday() }),
+                second: () => ({ status: ['-2'], dateStart_close: lastSunday() }) },
 };
 const FIELDS = [
   { k: 'id', t: "מס' פנייה" }, { k: 'status', t: 'סטטוס' }, { k: 'date', t: 'תאריך' },
@@ -431,6 +434,20 @@ async function load() {
   try {
     const r = await native('list', buildParams());
     if (my !== loadSeq) return;
+    state.flow = null;
+    const q2 = (QUICK[state.quick] || {}).second;
+    if (q2) {
+      // Opened since Sunday + closed since Sunday, each case once.
+      const r2 = await native('list', q2());
+      if (my !== loadSeq) return;
+      const opened = new Set(r.items.map((i) => i.id)), closed = new Set(r2.items.map((i) => i.id));
+      const seen = new Set();
+      r.items = [...r.items, ...r2.items].filter((i) => !seen.has(i.id) && seen.add(i.id));
+      r.total = r.items.length;
+      r.truncated = r.truncated || r2.truncated;
+      state.flow = { opened: opened.size, closed: closed.size,
+        stillOpen: [...opened].filter((id) => !closed.has(id)).length, closedIds: closed };
+    }
     const f = (QUICK[state.quick] || {}).filter;
     state.items = f ? r.items.filter(f) : r.items;
     state.total = f ? state.items.length : r.total;
@@ -491,6 +508,12 @@ function render() {
   $('summary').innerHTML = `
     <h2><span class="big">${items.length}</span> ${esc(title)}</h2>
     ${state.truncated ? `<div style="font-size:12px;color:var(--muted)">מוצגות ${state.items.length} מתוך ${state.total}</div>` : ''}
+    ${state.flow ? `<div class="stats">
+      <div class="stat"><b>${state.flow.opened}</b>נפתחו</div>
+      <div class="stat" style="color:var(--ok)"><b>${state.flow.closed}</b>נסגרו</div>
+      <div class="stat warn"><b>${state.flow.stillOpen}</b>מהשבוע עדיין פתוחות</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin:-4px 0 8px">מיום ראשון ${esc(lastSunday().split('-').reverse().join('/'))} 00:00 ועד עכשיו</div>` : ''}
     <div class="stats">
       <div class="stat warn"><b>${sla80}</b>SLA 80%+</div>
       <div class="stat bad"><b>${sla100}</b>חרגו</div>
@@ -523,7 +546,7 @@ function render() {
       <div class="actions">
         <button data-act="share">שיתוף</button>
         <button data-act="open">פתח באתר</button>
-        ${state.quick !== 'closedWeek' ? '<button data-act="close">✔ סגירה</button>' : ''}
+        ${state.quick !== 'closedWeek' && !(state.flow && state.flow.closedIds.has(i.id)) ? '<button data-act="close">✔ סגירה</button>' : ''}
         ${i.phone ? `<a href="tel:${esc(i.phone)}">📞 חייג</a>` : ''}
       </div>
     </div>`).join('');
