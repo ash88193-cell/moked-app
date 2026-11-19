@@ -258,7 +258,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-19.1';
+const APP_VERSION = '2026-11-19.2';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -281,6 +281,7 @@ function toast(msg, ms = 2600) {
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const daysAgo = (n) => iso(new Date(Date.now() - n * 864e5));
+const lastSunday = () => { const d = new Date(); d.setDate(d.getDate() - d.getDay()); return iso(d); }; // Sunday 00:00 (Saturday midnight)
 const cleanAddr = (a) => (a || '').replace(/,\s*[^,()]*-{2,}[^,()]*/g, '').replace(/\s*\(/, ' (').trim();
 
 function show(view) {
@@ -294,7 +295,7 @@ const QUICK = {
   sla80:      { label: 'SLA מעל 80%',    params: () => ({ status: ['-1'] }), filter: (i) => i.sla >= 80 },
   sla100:     { label: 'חרגו מה-SLA',    params: () => ({ status: ['-1'] }), filter: (i) => i.sla >= 100 },
   week:       { label: 'נפתחו השבוע',    params: () => ({ status: [], dateStart: daysAgo(7) }) },
-  closedWeek: { label: 'נסגרו השבוע',    params: () => ({ status: ['-2'], dateStart_close: daysAgo(7) }) },
+  closedWeek: { label: 'נסגרו השבוע',    params: () => ({ status: ['-2'], dateStart_close: lastSunday() }) },
 };
 const FIELDS = [
   { k: 'id', t: "מס' פנייה" }, { k: 'status', t: 'סטטוס' }, { k: 'date', t: 'תאריך' },
