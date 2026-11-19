@@ -4,7 +4,7 @@
   if (window.__moked) return;
 
   // Bump on every change: an open site page swaps itself to a newer published copy.
-  const VERSION = '2026-11-09.5';
+  const VERSION = '2026-11-19.1';
   const SELF_URL = 'https://ash88193-cell.github.io/moked-app/site.js';
   let checkedAt = 0;
 
@@ -136,7 +136,7 @@
       // The phone layout has no SLA column, only opened + due dates: SLA = share of the time used.
       if (it.sla == null && it.opened && it.due) {
         const o = parseDate(it.opened), d = parseDate(it.due);
-        if (o && d && d > o) it.sla = Math.round(((Date.now() - o) / (d - o)) * 100);
+        if (o && d && d > o) { it.sla = Math.round(((Date.now() - o) / (d - o)) * 100); it.slaComputed = true; }
       }
       return it;
     });
@@ -185,7 +185,36 @@
       items.push(...res.items);
       if (!res.items.length || (total !== null && items.length >= total)) break;
     }
+    await fixClosedSla(items, params || {});
     return { total: total === null ? items.length : total, items, truncated: total !== null && items.length < total, diag: lastDiag, siteVersion: VERSION };
+  }
+
+  // The phone layout has no SLA column, so SLA is computed from the dates. For a closed case the
+  // clock stops at the close time, which only the case page shows ("תאריך סגירה/הסתרה").
+  const CLOSED_RE = /סגור|לא נמצאה|החלט|הקפא|תכנית/;
+  const closeCache = {};
+  async function closeTime(id) {
+    const key = 'mokedClose:' + id;
+    if (closeCache[id]) return closeCache[id];
+    try { const s = localStorage.getItem(key); if (s) return (closeCache[id] = s); } catch (e) {}
+    const html = await getHtml('/ims/system/?view=custom&module=moked-page&id=' + encodeURIComponent(id));
+    const m = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').match(/תאריך סגירה\/הסתרה:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{2})/);
+    if (!m) return null;
+    closeCache[id] = m[1];
+    try { localStorage.setItem(key, m[1]); } catch (e) {}
+    return m[1];
+  }
+  async function fixClosedSla(items, params) {
+    const closedQuery = (params.status || []).includes('-2') || !!params.dateStart_close;
+    const todo = items.filter((it) => it.slaComputed && (closedQuery || CLOSED_RE.test(it.status || ''))).slice(0, 60);
+    for (let i = 0; i < todo.length; i += 4) {
+      await Promise.all(todo.slice(i, i + 4).map(async (it) => {
+        try {
+          const c = parseDate(await closeTime(it.id)), o = parseDate(it.opened), d = parseDate(it.due);
+          if (c && o && d && d > o) { it.sla = Math.round(((c - o) / (d - o)) * 100); it.closedAt = c; }
+        } catch (e) {}
+      }));
+    }
   }
 
   async function detail(id) {
