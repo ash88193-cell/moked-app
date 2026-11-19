@@ -258,7 +258,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-19.3';
+const APP_VERSION = '2026-11-19.4';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -445,8 +445,10 @@ async function load() {
       r.items = [...r.items, ...r2.items].filter((i) => !seen.has(i.id) && seen.add(i.id));
       r.total = r.items.length;
       r.truncated = r.truncated || r2.truncated;
-      state.flow = { opened: opened.size, closed: closed.size,
-        stillOpen: [...opened].filter((id) => !closed.has(id)).length, closedIds: closed };
+      // All cases of the week = closed + still open, so the numbers add up.
+      state.flow = { total: r.items.length, closed: closed.size,
+        stillOpen: r.items.filter((i) => !closed.has(i.id)).length,
+        before: [...closed].filter((id) => !opened.has(id)).length, closedIds: closed };
     }
     const f = (QUICK[state.quick] || {}).filter;
     state.items = f ? r.items.filter(f) : r.items;
@@ -509,15 +511,15 @@ function render() {
     <h2><span class="big">${items.length}</span> ${esc(title)}</h2>
     ${state.truncated ? `<div style="font-size:12px;color:var(--muted)">מוצגות ${state.items.length} מתוך ${state.total}</div>` : ''}
     ${state.flow ? `<div class="stats">
-      <div class="stat"><b>${state.flow.opened}</b>נפתחו</div>
+      <div class="stat"><b>${state.flow.total}</b>נפתחו</div>
       <div class="stat" style="color:var(--ok)"><b>${state.flow.closed}</b>נסגרו</div>
-      <div class="stat warn"><b>${state.flow.stillOpen}</b>מהשבוע עדיין פתוחות</div>
+      <div class="stat warn"><b>${state.flow.stillOpen}</b>נשארו פתוחות</div>
     </div>
-    <div style="font-size:12px;color:var(--muted);margin:-4px 0 8px">מיום ראשון ${esc(lastSunday().split('-').reverse().join('/'))} 00:00 ועד עכשיו</div>` : ''}
+    <div style="font-size:12px;color:var(--muted);margin:-4px 0 8px">מיום ראשון ${esc(lastSunday().split('-').reverse().join('/'))} 00:00 ועד עכשיו${state.flow.before ? ` · כולל ${state.flow.before} שנפתחו לפני ראשון ונסגרו השבוע` : ''}</div>` : ''}
     <div class="stats">
+      <div class="stat" style="color:var(--ok)"><b>${items.filter((i) => i.sla != null && i.sla < 80).length}</b>בזמן</div>
       <div class="stat warn"><b>${sla80}</b>SLA 80%+</div>
       <div class="stat bad"><b>${sla100}</b>חרגו</div>
-      <div class="stat"><b>${byStatus.length}</b>סטטוסים</div>
     </div>
     <div class="bars">${bySubj.map(([k, n]) => `
       <div class="bar-row"><span class="name">${esc(k)}</span>
