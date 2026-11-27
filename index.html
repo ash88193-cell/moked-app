@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>פניות מוקד</title>
+<script>
+// Opened in Chrome with pictures to make (see openExport): go to the export page.
+if (!window.Native && /^#[zj]=/.test(location.hash)) location.replace('export.html' + location.hash);
+</script>
 <style>
   :root {
     --brand: #0F4C5C; --brand-2: #16697A; --accent: #F2B134; --bg: #F3F5F7; --card: #fff;
@@ -296,7 +300,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-27.5';
+const APP_VERSION = '2026-11-27.6';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -954,7 +958,9 @@ function chartImageSvg() {
 
 /* Pictures are made in Chrome (export.html): the app sends the data in the address after '#',
    which never reaches any server. Name and phone are not sent at all. Works with the installed app. */
-const EXPORT_URL = 'http://ash88193-cell.github.io/moked-app/export.html'; // http: opens outside the app, in Chrome
+// No trailing slash: the app's WebView treats it as an outside address and hands it to Chrome; GitHub redirects
+// it to index.html (keeping the '#'), which forwards to export.html.
+const EXPORT_URL = 'https://ash88193-cell.github.io/moked-app';
 async function packPayload(obj) {
   const bytes = new TextEncoder().encode(JSON.stringify(obj));
   let kind = 'j', data = bytes;
