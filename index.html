@@ -123,7 +123,7 @@
   .wk-legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin: 2px 0 4px; }
   .wk-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-left: 5px; vertical-align: -1px; }
   .wk-tip { font-size: 13px; color: var(--text); min-height: 18px; margin-top: 2px; }
-  .wk-chart svg { width: 100%; height: auto; display: block; }
+  .wk-chart svg { direction: ltr; width: 100%; height: auto; display: block; }
   .wk-chart g[data-i] { cursor: pointer; }
   .wk-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
   .wk-table th, .wk-table td { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: center; }
@@ -296,7 +296,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-27.3';
+const APP_VERSION = '2026-11-27.4';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -946,9 +946,11 @@ function chartImageSvg() {
   rows.forEach((x, i) => {
     const y = tableTop + 52 + i * 30;
     s += `<line x1="20" x2="${W - 20}" y1="${y - 21}" y2="${y - 21}" stroke="#E3E7EB"/>`;
-    s += [weekLabel(x), x.opened.length, x.closed.length, x.slaAvg == null ? '–' : x.slaAvg + '%']
-      .map((v, j) => t(cols[j], y, v, 16, 'fill="#1B2430"')).join('');
+    s += `<text x="${cols[0]}" y="${y}" font-size="16" fill="#1B2430" direction="ltr" text-anchor="end">${dm(x.from)}–${dm(x.to)}${x.partial ? '*' : ''}</text>`;
+    s += [x.opened.length, x.closed.length, x.slaAvg == null ? '–' : x.slaAvg + '%']
+      .map((v, j) => t(cols[j + 1], y, v, 16, 'fill="#1B2430"')).join('');
   });
+  if (rows.some((x) => x.partial)) s += t(W - 20, H - 12, '* השבוע הנוכחי – עד עכשיו', 13, 'fill="#66707C"');
   return { svg: s + '</svg>', W, H };
 }
 
