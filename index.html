@@ -4,10 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>פניות מוקד</title>
-<script>
-// Opened in Chrome with pictures to make (see openExport): go to the export page.
-if (!window.Native && /^#[zj]=/.test(location.hash)) location.replace('export.html' + location.hash);
-</script>
 <style>
   :root {
     --brand: #0F4C5C; --brand-2: #16697A; --accent: #F2B134; --bg: #F3F5F7; --card: #fff;
@@ -137,8 +133,8 @@ if (!window.Native && /^#[zj]=/.test(location.hash)) location.replace('export.ht
   .wk-case .body { flex: 1; min-width: 0; }
   .wk-tag { font-size: 11px; border-radius: 6px; padding: 1px 6px; background: #EEF1F3; color: var(--muted); }
   .wk-tag.closed { background: #E3F4EA; color: #1C6B3D; }
-  .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
-  .thumbs img { width: 100%; aspect-ratio: 9/16; object-fit: cover; object-position: top; border-radius: 8px; border: 1px solid var(--line); }
+  .thumbs { display: grid; grid-template-columns: repeat(2, 1fr); align-items: start; gap: 6px; margin-top: 8px; }
+  .thumbs img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); }
   .progress { height: 6px; background: #EEF1F3; border-radius: 3px; overflow: hidden; margin-top: 8px; }
   .progress i { display: block; height: 100%; background: var(--brand-2); transition: width .3s; }
 
@@ -300,7 +296,7 @@ if (!window.Native && /^#[zj]=/.test(location.hash)) location.replace('export.ht
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-27.8';
+const APP_VERSION = '2026-11-27.9';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -877,7 +873,7 @@ function renderWeekly() {
       ${d.noCloseTime ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">${d.noCloseTime} פניות סגורות בלי מועד סגירה בדף – לא נספרו</div>` : ''}
       ${d.truncated ? `<div style="font-size:12px;color:var(--bad);margin-top:6px">לא כל הפניות נטענו – המספרים חלקיים</div>` : ''}
       <div class="row-btns">
-        <button class="btn light" id="wkSaveChart">🖼 תמונה של הגרף</button>
+        <button class="btn light" id="wkSaveChart">💾 שמירת הגרף לגלריה</button>
       </div>
     </div>
 
@@ -921,7 +917,7 @@ function renderWeekly() {
 
 function updateWkSel() {
   $('wkSelN') && ($('wkSelN').textContent = wk.sel.size);
-  if (!wk.busy) $('wkSnap').textContent = wk.sel.size ? `🖼 הפקת תמונות: גרף + ${wk.sel.size} פניות` : 'בחר פניות';
+  if (!wk.busy) $('wkSnap').textContent = wk.sel.size ? `📷 צילום גרף + ${wk.sel.size} פניות` : 'בחר פניות';
   $('wkSnap').disabled = wk.busy || !wk.sel.size;
 }
 
@@ -956,41 +952,104 @@ function chartImageSvg() {
   return { svg: s + '</svg>', W, H };
 }
 
-/* Pictures are made in Chrome (export.html): the app sends the data in the address after '#',
-   which never reaches any server. Name and phone are not sent at all. Works with the installed app. */
-// No trailing slash: the app's WebView treats it as an outside address and hands it to Chrome; GitHub redirects
-// it to index.html (keeping the '#'), which forwards to export.html.
-const EXPORT_URL = 'https://ash88193-cell.github.io/moked-app';
-async function packPayload(obj) {
-  const bytes = new TextEncoder().encode(JSON.stringify(obj));
-  let kind = 'j', data = bytes;
-  if (window.CompressionStream) {
-    const cs = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
-    data = new Uint8Array(await new Response(cs).arrayBuffer()); kind = 'z';
-  }
-  let bin = ''; for (let i = 0; i < data.length; i += 0x8000) bin += String.fromCharCode.apply(null, data.subarray(i, i + 0x8000));
-  return kind + '=' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+/* Real screenshots: the installed app opens the site's list (phone layout) out of sight, shows one
+   case in it, blurs name and phone (site.js prepareCard) and photographs that card. Files go to the
+   gallery (Pictures/פניות מוקד). Needs the app version with the "capture" tools (caps). */
+async function hasCaptureTools() {
+  try { const c = await native('caps'); return c && c.version >= 2; } catch { return false; }
 }
-async function openExport({ withChart, withCases }) {
+async function saveDataUrl(name, dataUrl, mime) {
+  const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  const { token } = await native('fileOpen', { name, mime });
+  for (let i = 0; i < b64.length; i += 600000) await native('fileAppend', { token, b64: b64.slice(i, i + 600000) });
+  const r = await native('fileClose', { token, gallery: true });
+  return { token, where: r.where };
+}
+async function chartPng() {
+  const { svg, W, H } = chartImageSvg();
+  const img = new Image();
+  await new Promise((ok, bad) => { img.onload = ok; img.onerror = () => bad({ error: 'יצירת תמונת הגרף נכשלה' });
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+  const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2;
+  const g = cv.getContext('2d'); g.scale(2, 2); g.drawImage(img, 0, 0);
+  return cv.toDataURL('image/png');
+}
+function needInstall() {
+  toast('לצילום צריך להתקין פעם אחת את הגרסה החדשה של האפליקציה', 5000);
+}
+const tagOf = (w) => `${dm(w.from)}-${dm(w.to)}`;
+
+async function saveChart() {
+  if (wk.busy) return;
+  if (!(await hasCaptureTools())) return needInstall();
+  try {
+    const w = wk.weeks[wk.week];
+    const f = await saveDataUrl(`סיכום_שבועי_${tagOf(w)}.png`, await chartPng(), 'image/png');
+    wk.results = { items: [{ id: 'גרף', ok: true, thumb: null }], tokens: [f.token], where: f.where };
+    renderSnapResults();
+    toast('הגרף נשמר בגלריה');
+  } catch (e) { toast(e.error || 'השמירה נכשלה', 4000); }
+}
+
+$('wkSnap').onclick = async () => {
+  if (!wk.sel.size || wk.busy) return;
+  if (!(await hasCaptureTools())) return needInstall();
   const w = wk.weeks[wk.week];
-  const cases = withCases ? wk.cases.filter((c) => wk.sel.has(c.id)).map((c) => ({
-    id: c.id, subject: c.subject, subjectRaw: c.subjectRaw, address: c.address, opened: c.opened, due: c.due,
-    files: c.files, status: c.status, statusColor: c.statusColor, description: c.description,
-  })) : [];
-  const payload = { title: `סיכום שבועי ⁦${dm(w.from)}–${dm(w.to)}⁩`, label: `${dm(w.from)}-${dm(w.to)}`, cases };
-  if (withChart) { const c = chartImageSvg(); payload.chart = { svg: c.svg, w: c.W, h: c.H }; }
-  const a = document.createElement('a');
-  a.href = EXPORT_URL + '#' + await packPayload(payload);
-  a.target = '_top';
-  document.body.appendChild(a); a.click(); a.remove();
-  toast('התמונות נפתחות ב-Chrome…', 3000);
-}
-function saveChart() { openExport({ withChart: true, withCases: false }).catch(() => toast('פתיחה נכשלה')); }
-$('wkSnap').onclick = () => {
-  if (!wk.sel.size) return;
-  openExport({ withChart: true, withCases: true }).catch(() => toast('פתיחה נכשלה'));
+  const list = wk.cases.filter((c) => wk.sel.has(c.id));
+  wk.busy = true; updateWkSel(); $('wkSnap').textContent = 'מצלם…';
+  $('wkResults').innerHTML = `<div class="card"><div id="wkProgTxt">מתחיל…</div><div class="progress" id="wkProg"><i style="width:0"></i></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">כל פנייה מוצגת ברשימת הפניות של האתר (קריאה בלבד) ומצולמת. שם וטלפון הפונה מטושטשים.</div></div>`;
+  $('wkResults').scrollIntoView({ block: 'start' });
+  const prog = (i, n, t) => { const el = $('wkProg'); if (el) el.querySelector('i').style.width = Math.round(i / n * 100) + '%'; if ($('wkProgTxt')) $('wkProgTxt').textContent = t; };
+  const res = { items: [], tokens: [], where: '' };
+  try {
+    prog(0, list.length + 1, 'שומר את הגרף…');
+    const f = await saveDataUrl(`סיכום_שבועי_${tagOf(w)}.png`, await chartPng(), 'image/png');
+    res.tokens.push(f.token); res.where = f.where;
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i];
+      prog(i + 1, list.length + 1, `מצלם פנייה ${i + 1} מתוך ${list.length} (#${c.id})…`);
+      try {
+        const r = await native('capture', {
+          url: SITE + '?view=custom&module=moked-list',
+          prepare: `__moked.prepareCard(${JSON.stringify({ id: c.id, name: c.name || '', phone: c.phone || '' })})`,
+          timeoutMs: 60000,
+        });
+        const s = await saveDataUrl(`פנייה_${c.id}_${tagOf(w)}.jpg`, r.dataUrl, 'image/jpeg');
+        res.tokens.push(s.token); res.where = s.where || res.where;
+        res.items.push({ id: c.id, ok: true, thumb: r.dataUrl });
+      } catch (e) {
+        if (e.auth) throw e;
+        res.items.push({ id: c.id, ok: false, error: e.error || 'נכשל' });
+      }
+    }
+    prog(1, 1, 'סיום');
+    wk.results = res;
+  } catch (e) {
+    if (e.auth) { wk.busy = false; native('captureDone').catch(() => {}); toast('החיבור למערכת פג – מתחבר מחדש…'); entered = false; return start(); }
+    toast(e.error || 'הצילום נכשל', 4000);
+    wk.results = res.items.length ? res : null;
+  } finally {
+    native('captureDone').catch(() => {});
+    wk.busy = false; updateWkSel(); renderSnapResults();
+  }
 };
-function renderSnapResults() {}
+
+function renderSnapResults() {
+  const r = wk.results, box = $('wkResults');
+  if (!box) return;
+  if (!r) { box.innerHTML = ''; return; }
+  const good = r.items.filter((x) => x.ok && x.thumb), bad = r.items.filter((x) => !x.ok);
+  box.innerHTML = `<div class="card">
+    <b>${r.tokens.length} תמונות נשמרו בגלריה</b>
+    ${r.where ? `<div style="font-size:12px;color:var(--muted)">תיקייה: ${esc(r.where)}</div>` : ''}
+    ${bad.length ? `<div style="font-size:13px;color:var(--bad);margin-top:6px">לא צולמו: ${bad.map((x) => `#${esc(x.id)} (${esc(x.error)})`).join(', ')}</div>` : ''}
+    <div class="thumbs">${good.map((x) => `<img src="${x.thumb}" alt="פנייה ${esc(x.id)}">`).join('')}</div>
+    ${r.tokens.length ? '<div class="row-btns"><button class="btn block" id="wkShareSnaps">שיתוף כל התמונות</button></div>' : ''}
+  </div>`;
+  const sb = $('wkShareSnaps');
+  if (sb) sb.onclick = () => native('shareFiles', { tokens: r.tokens, mime: 'image/*' }).catch((e) => toast(e.error || 'שגיאה'));
+}
 
 /* ---------- settings ---------- */
 function fmtTime(ms) {
