@@ -4,7 +4,7 @@
   if (window.__moked) return;
 
   // Bump on every change: an open site page swaps itself to a newer published copy.
-  const VERSION = '2026-11-27.5';
+  const VERSION = '2026-11-27.6';
   const SELF_URL = 'https://ash88193-cell.github.io/moked-app/site.js';
   let checkedAt = 0;
 
@@ -380,6 +380,19 @@
     area.innerHTML = html;
     const tr = document.getElementById('itemTr' + id);
     if (!tr) throw new Error('הפנייה ' + id + ' לא נמצאה ברשימה');
+    // The site colours every second card in cream; make ours the second one (hidden row before it),
+    // and if the site's colour still does not apply, paint the same cream.
+    const ph = document.createElement('tr');
+    ph.style.display = 'none';
+    tr.parentNode.insertBefore(ph, tr);
+    await sleep(50);
+    const isWhite = (el) => !el || /^rgba?\(255, 255, 255|^rgba\(0, 0, 0, 0\)|^transparent/.test(getComputedStyle(el).backgroundColor);
+    const cell = tr.querySelector('td');
+    if (isWhite(tr) && isWhite(cell)) {
+      const CREAM = 'rgb(250, 248, 222)';
+      tr.style.setProperty('background-color', CREAM, 'important');
+      tr.querySelectorAll('td, th').forEach((td) => td.style.setProperty('background-color', CREAM, 'important'));
+    }
     for (let i = 0; i < 15 && [...tr.querySelectorAll('img')].some((im) => !im.complete); i++) await sleep(200);
     mask({ name: a.name, phone: a.phone });
     await sleep(300);
