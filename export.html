@@ -78,10 +78,8 @@ const dots = (n) => '●'.repeat(n);
 function drawCard(c) {
   const cv = document.createElement('canvas');
   const g = cv.getContext('2d');
-  const PAD = 14, LBL = 118, CX = PAD, CW = W - PAD * 2;
-  const valR = CX + CW - LBL - 12, valL = CX + 14, valW = valR - valL;
+  const PAD = 14, CX = PAD, CW = W - PAD * 2;
   const LH = 25;
-  g.font = `17px ${FONT}`;
 
   // Rows: [label, kind, value]
   const rows = [
@@ -97,6 +95,9 @@ function drawCard(c) {
   rows.push(['סטטוס פניה', 'pill', c.status || '', c.statusColor || '#64AFFA']);
   if (c.description) rows.push(['תיאור האירוע', 'text', c.description]);
 
+  g.font = `700 18px ${FONT}`;
+  const LBL = Math.max(...rows.map((r) => g.measureText(r[0]).width)) + 10;
+  const valR = CX + CW - 14 - LBL - 14, valL = CX + 14, valW = valR - valL;
   // Measure heights first.
   const heights = rows.map(([, kind, v]) => {
     if (kind === 'text') { g.font = `17px ${FONT}`; return Math.max(1, wrap(g, v, valW).length) * LH + 22; }
@@ -135,14 +136,16 @@ function drawCard(c) {
     } else if (kind === 'hidden') {
       g.save(); g.filter = 'blur(3.5px)'; g.fillStyle = '#444'; g.fillText(dots(v), valR, y + 31); g.restore();
     } else if (kind === 'phone') {
-      const label2 = ' - חייג לפונה', num = '●●●-●●●●●●●';
+      const heb = 'חייג לפונה', dash = ' - ', num = '●●●-●●●●●●●';
       g.font = `17px ${FONT}`;
-      const w = g.measureText(num + label2).width + 30;
+      const hw = g.measureText(heb).width, dw = g.measureText(dash).width, nw = g.measureText(num).width;
+      const w = hw + dw + nw + 30;
       g.fillStyle = '#E2382B'; rr(g, valR - w, y + 12, w, 34, 17); g.fill();
-      g.fillStyle = '#fff'; g.textAlign = 'right';
-      g.fillText(label2, valR - 15, y + 35);
-      const lw = g.measureText(label2).width;
-      g.save(); g.filter = 'blur(3.5px)'; g.fillText(num, valR - 15 - lw, y + 35); g.restore();
+      g.fillStyle = '#fff'; g.textAlign = 'left'; g.direction = 'ltr';
+      const x0 = valR - w + 15;
+      g.save(); g.filter = 'blur(3.5px)'; g.fillText(num, x0, y + 35); g.restore();
+      g.fillText(dash, x0 + nw, y + 35);
+      g.direction = 'rtl'; g.textAlign = 'right'; g.fillText(heb, valR - 15, y + 35);
     } else if (kind === 'pill') {
       g.font = `17px ${FONT}`;
       const w = g.measureText(v).width + 30;

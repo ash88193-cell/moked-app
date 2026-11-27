@@ -300,7 +300,7 @@ if (!window.Native && /^#[zj]=/.test(location.hash)) location.replace('export.ht
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-27.6';
+const APP_VERSION = '2026-11-27.7';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -977,7 +977,7 @@ async function openExport({ withChart, withCases }) {
     id: c.id, subject: c.subject, subjectRaw: c.subjectRaw, address: c.address, opened: c.opened, due: c.due,
     files: c.files, status: c.status, statusColor: c.statusColor, description: c.description,
   })) : [];
-  const payload = { title: `סיכום שבועי ${dm(w.from)}–${dm(w.to)}`, label: `${dm(w.from)}-${dm(w.to)}`, cases };
+  const payload = { title: `סיכום שבועי ⁦${dm(w.from)}–${dm(w.to)}⁩`, label: `${dm(w.from)}-${dm(w.to)}`, cases };
   if (withChart) { const c = chartImageSvg(); payload.chart = { svg: c.svg, w: c.W, h: c.H }; }
   const a = document.createElement('a');
   a.href = EXPORT_URL + '#' + await packPayload(payload);
