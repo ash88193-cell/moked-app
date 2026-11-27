@@ -72,7 +72,7 @@ function wrap(g, text, maxW) {
   }
   return lines;
 }
-const dots = (n) => '●'.repeat(n);
+const dots = (n) => '•'.repeat(n);
 
 // One case card in the look of the site's phone list ("רשימת פניות").
 function drawCard(c) {
@@ -136,7 +136,7 @@ function drawCard(c) {
     } else if (kind === 'hidden') {
       g.save(); g.filter = 'blur(3.5px)'; g.fillStyle = '#444'; g.fillText(dots(v), valR, y + 31); g.restore();
     } else if (kind === 'phone') {
-      const heb = 'חייג לפונה', dash = ' - ', num = '●●●-●●●●●●●';
+      const heb = 'חייג לפונה', dash = ' - ', num = '•••-•••••••';
       g.font = `17px ${FONT}`;
       const hw = g.measureText(heb).width, dw = g.measureText(dash).width, nw = g.measureText(num).width;
       const w = hw + dw + nw + 30;
