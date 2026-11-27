@@ -4,7 +4,7 @@
   if (window.__moked) return;
 
   // Bump on every change: an open site page swaps itself to a newer published copy.
-  const VERSION = '2026-11-27.3';
+  const VERSION = '2026-11-27.4';
   const SELF_URL = 'https://ash88193-cell.github.io/moked-app/site.js';
   let checkedAt = 0;
 
@@ -273,7 +273,10 @@
     // Any Israeli phone number, with or without dashes / +972.
     parts.push('(?:\\+?972[\\s\\-]?|0)(?:5\\d|7\\d|[23489])[\\s\\-]?\\d{3}[\\s\\-]?\\d{4}');
     const re = new RegExp('(?<![' + LETTER + '0-9])(?:' + parts.join('|') + ')(?![' + LETTER + '0-9])', 'g');
-    const dots = (s) => s.replace(/\S/g, '●');
+    // Same kind of characters (so the blur looks natural), but random: nothing can be recovered.
+    const HEB = 'אבגדהוזחטיכלמנסעפצקרשת';
+    const dots = (s) => s.replace(/\d/g, () => String(Math.floor(Math.random() * 10)))
+      .replace(/[א-ת]/g, () => HEB[Math.floor(Math.random() * HEB.length)]).replace(/[A-Za-z]/g, 'x');
 
     if (!document.getElementById('__mkStyle')) {
       const st = document.createElement('style');
@@ -299,14 +302,28 @@
       re.lastIndex = 0;
       if (re.test(t.nodeValue)) hits.push(t);
     }
+    // Only the matched words are replaced and blurred (e.g. the number, not "חייג לפונה").
     hits.forEach((t) => {
+      const text = t.nodeValue, frag = document.createDocumentFragment();
+      let last = 0;
       re.lastIndex = 0;
-      t.nodeValue = t.nodeValue.replace(re, dots);
-      hide(t.parentElement);
+      for (let m; (m = re.exec(text));) {
+        if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+        const sp = document.createElement('span');
+        sp.textContent = dots(m[0]);
+        sp.style.display = 'inline-block';
+        hide(sp);
+        frag.appendChild(sp);
+        last = m.index + m[0].length;
+      }
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      t.parentNode.replaceChild(frag, t);
     });
     // 2. Phone links and form fields.
     document.querySelectorAll('a[href^="tel:"], a[href^="mailto:"], a[href*="wa.me"], a[href*="whatsapp"]').forEach((el) => {
-      el.removeAttribute('href'); hideText(el);
+      el.removeAttribute('href');
+      // The number inside was already replaced above; otherwise hide the whole link.
+      if (!el.querySelector('.__mk')) hideText(el);
     });
     document.querySelectorAll('input, textarea').forEach((el) => {
       if (el.type === 'hidden' || !el.value) return;
@@ -335,6 +352,36 @@
       }
     });
     return n;
+  }
+
+  // Shows one case in the site's own list (same HTML the site shows, phone layout on the phone),
+  // hides the resident's details, and returns the card's area for the app to photograph.
+  async function prepareCard(a) {
+    const id = String(a.id).replace(/\D/g, '');
+    const area = document.getElementById('items_area');
+    const form = document.getElementById('search_data') || [...document.forms].find((f) => f.elements['status[]']);
+    if (!area || !form) throw new Error('דף רשימת הפניות לא נטען');
+    const body = new URLSearchParams(new FormData(form));
+    // Only this case: no saved filters (lists = all), no dates, no text fields.
+    for (const k of [...new Set(body.keys())]) {
+      if (k.endsWith('[]')) body.delete(k);
+      else if (/^(phone|fname|lname|description|home|dateStart|dateEnd|dateStart_close|dateEnd_close)$/.test(k)) body.set(k, '');
+    }
+    body.set('num', id);
+    const html = await getHtml(ITEMS_URL + '?time=' + Date.now(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
+      body: body.toString(),
+    });
+    area.innerHTML = html;
+    const tr = document.getElementById('itemTr' + id);
+    if (!tr) throw new Error('הפנייה ' + id + ' לא נמצאה ברשימה');
+    for (let i = 0; i < 15 && [...tr.querySelectorAll('img')].some((im) => !im.complete); i++) await sleep(200);
+    mask({ name: a.name, phone: a.phone });
+    await sleep(300);
+    window.scrollTo(0, 0);
+    const r = tr.getBoundingClientRect(), pad = 10;
+    return { x: Math.max(0, r.left + scrollX - pad), y: Math.max(0, r.top + scrollY - pad), w: r.width + pad * 2, h: r.height + pad * 2 };
   }
 
   async function detail(id) {
@@ -456,5 +503,5 @@
     return out;
   }
 
-  window.__moked = { run, list, detail, options, status, prepareUpdate, referral, weekly, mask, version: VERSION };
+  window.__moked = { run, list, detail, options, status, prepareUpdate, referral, weekly, mask, prepareCard, version: VERSION };
 })();
