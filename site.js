@@ -4,7 +4,7 @@
   if (window.__moked) return;
 
   // Bump on every change: an open site page swaps itself to a newer published copy.
-  const VERSION = '2026-11-27.1';
+  const VERSION = '2026-11-27.2';
   const SELF_URL = 'https://ash88193-cell.github.io/moked-app/site.js';
   let checkedAt = 0;
 
@@ -82,7 +82,7 @@
   const FUZZY = [
     [/מס.?\s*פני/, 'id'], [/תאריך.*פתיח|נפתח/, 'opened'], [/סטטוס/, 'status'], [/שם\s*(ה)?פונה|^פונה$/, 'name'],
     [/טלפון|נייד/, 'phone'], [/כתובת|רחוב|מיקום/, 'address'], [/מחלק/, 'department'], [/SLA/i, 'sla'],
-    [/תיאור/, 'description'], [/נושא|סיווג/, 'subject'], [/יעד/, 'due'], [/גורם\s*מטפל/, 'handler'], [/מקור/, 'source'], [/מוקדן/, 'opener'],
+    [/תיאור/, 'description'], [/תמונ/, 'files'], [/נושא|סיווג/, 'subject'], [/יעד/, 'due'], [/גורם\s*מטפל/, 'handler'], [/מקור/, 'source'], [/מוקדן/, 'opener'],
   ];
   function colKey(name) {
     name = clean(name);
@@ -127,7 +127,11 @@
         } else if (key === 'phone') {
           const a = td.querySelector('a[href^="tel:"]');
           it.phone = a ? a.getAttribute('href').slice(4) : clean(td.textContent);
+        } else if (key === 'files') {
+          const m = clean(td.textContent).match(/((d+))/);
+          it.files = m ? +m[1] : (td.querySelector('a,img,button') ? 1 : 0);
         } else if (key === 'subject') {
+          it.subjectRaw = clean(td.textContent);
           it.subject = clean(td.textContent).replace(/\s*\\\s*/g, '/');
         } else it[key] = clean(td.textContent);
       });
@@ -220,7 +224,7 @@
   // Weekly summary: everything opened and everything closed between two times (ms).
   // Every closed case gets its close time (case page, cached) and its SLA share at closing.
   const isoDay = (ms) => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-  const KEEP = ['id', 'subject', 'address', 'status', 'statusColor', 'opened', 'due', 'sla', 'name', 'phone', 'closedAt'];
+  const KEEP = ['id', 'subject', 'subjectRaw', 'files', 'description', 'address', 'status', 'statusColor', 'opened', 'due', 'sla', 'name', 'phone', 'closedAt'];
   const slim = (it) => { const o = {}; KEEP.forEach((k) => { if (it[k] != null) o[k] = it[k]; }); o.openedAt = parseDate(it.opened); return o; };
   async function weekly(a) {
     const from = +a.from, to = +(a.to || Date.now());

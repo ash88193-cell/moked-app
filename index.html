@@ -296,7 +296,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-27.4';
+const APP_VERSION = '2026-11-27.5';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -873,12 +873,11 @@ function renderWeekly() {
       ${d.noCloseTime ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">${d.noCloseTime} פניות סגורות בלי מועד סגירה בדף – לא נספרו</div>` : ''}
       ${d.truncated ? `<div style="font-size:12px;color:var(--bad);margin-top:6px">לא כל הפניות נטענו – המספרים חלקיים</div>` : ''}
       <div class="row-btns">
-        <button class="btn light" id="wkSaveChart">💾 שמירה כתמונה</button>
-        <button class="btn light" id="wkShareChart">שיתוף התמונה</button>
+        <button class="btn light" id="wkSaveChart">🖼 תמונה של הגרף</button>
       </div>
     </div>
 
-    <h3 style="margin:16px 0 8px;font-size:16px">צילומי פניות</h3>
+    <h3 style="margin:16px 0 8px;font-size:16px">תמונות פניות</h3>
     <div class="toggles">${wk.weeks.map((x, i) => `<button class="tg ${i === wk.week ? 'on' : ''}" data-w="${i}">${esc(weekLabel(x))}</button>`).reverse().join('')}</div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
       <span style="font-size:13px;color:var(--muted);flex:1">${cases.length} פניות בשבוע · נבחרו <b id="wkSelN">${wk.sel.size}</b></span>
@@ -911,7 +910,6 @@ function renderWeekly() {
   $('wkAll').onclick = () => { cases.forEach((c) => wk.sel.add(c.id)); renderWeekly(); };
   $('wkNone').onclick = () => { wk.sel.clear(); renderWeekly(); };
   $('wkSaveChart').onclick = () => saveChart(false);
-  $('wkShareChart').onclick = () => saveChart(true);
   renderSnapResults();
   updateWkSel();
   $('wkBottom').classList.remove('hidden');
@@ -919,7 +917,7 @@ function renderWeekly() {
 
 function updateWkSel() {
   $('wkSelN') && ($('wkSelN').textContent = wk.sel.size);
-  if (!wk.busy) $('wkSnap').textContent = wk.sel.size ? `📷 צילום ${wk.sel.size} פניות` : 'בחר פניות לצילום';
+  if (!wk.busy) $('wkSnap').textContent = wk.sel.size ? `🖼 הפקת תמונות: גרף + ${wk.sel.size} פניות` : 'בחר פניות';
   $('wkSnap').disabled = wk.busy || !wk.sel.size;
 }
 
@@ -954,61 +952,39 @@ function chartImageSvg() {
   return { svg: s + '</svg>', W, H };
 }
 
-async function saveChart(share) {
-  try {
-    const { svg, W, H } = chartImageSvg();
-    const img = new Image();
-    await new Promise((ok, bad) => { img.onload = ok; img.onerror = () => bad({ error: 'יצירת התמונה נכשלה' });
-      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
-    const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2;
-    const g = cv.getContext('2d'); g.scale(2, 2); g.drawImage(img, 0, 0);
-    const last = wk.weeks[wk.weeks.length - 1];
-    const r = await native('saveImage', { dataUrl: cv.toDataURL('image/png'), name: `סיכום_שבועי_${dm(last.to)}_${Date.now() % 100000}.png`, share });
-    if (!r) return toast('שמירה זמינה רק בטלפון');
-    if (!share) toast(`נשמר בגלריה: ${r.folder}`);
-  } catch (e) { toast(e.error === 'unknown method saveImage' ? 'צריך להתקין את הגרסה החדשה של האפליקציה' : (e.error || 'השמירה נכשלה'), 4000); }
-}
-
-/* Photos of the chosen cases: each case page in phone layout, name and phone hidden. */
-window.onSnapProgress = (i, n) => {
-  const el = $('wkProg'); if (!el) return;
-  el.querySelector('i').style.width = Math.round((i - 1) / n * 100) + '%';
-  $('wkProgTxt').textContent = `מצלם פנייה ${i} מתוך ${n}…`;
-};
-$('wkSnap').onclick = async () => {
-  const w = wk.weeks[wk.week];
-  const items = wk.cases.filter((c) => wk.sel.has(c.id)).map((c) => ({ id: c.id, name: c.name || '', phone: c.phone || '' }));
-  if (!items.length || wk.busy) return;
-  wk.busy = true; updateWkSel(); $('wkSnap').textContent = 'מצלם…';
-  $('wkResults').innerHTML = `<div class="card"><div id="wkProgTxt">מתחיל…</div><div class="progress" id="wkProg"><i style="width:0"></i></div>
-    <div style="font-size:12px;color:var(--muted);margin-top:6px">כל פנייה נפתחת באתר לקריאה בלבד ומצולמת. שם וטלפון הפונה מוסתרים.</div></div>`;
-  $('wkResults').scrollIntoView({ block: 'start' });
-  try {
-    const r = await native('snapCases', { items, label: `${dm(w.from)}-${dm(w.to)}` });
-    if (!r) { wk.results = null; toast('צילום זמין רק בטלפון'); }
-    else wk.results = r;
-  } catch (e) {
-    if (e.auth) { wk.busy = false; toast('החיבור למערכת פג – מתחבר מחדש…'); entered = false; return start(); }
-    toast(e.error === 'unknown method snapCases' ? 'צריך להתקין את הגרסה החדשה של האפליקציה' : (e.error || 'הצילום נכשל'), 4000);
-  } finally {
-    wk.busy = false; updateWkSel(); renderSnapResults();
+/* Pictures are made in Chrome (export.html): the app sends the data in the address after '#',
+   which never reaches any server. Name and phone are not sent at all. Works with the installed app. */
+const EXPORT_URL = 'http://ash88193-cell.github.io/moked-app/export.html'; // http: opens outside the app, in Chrome
+async function packPayload(obj) {
+  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  let kind = 'j', data = bytes;
+  if (window.CompressionStream) {
+    const cs = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    data = new Uint8Array(await new Response(cs).arrayBuffer()); kind = 'z';
   }
-};
-function renderSnapResults() {
-  const r = wk.results, box = $('wkResults');
-  if (!box) return;
-  if (!r) { box.innerHTML = ''; return; }
-  const good = r.items.filter((x) => x.ok), bad = r.items.filter((x) => !x.ok);
-  box.innerHTML = `<div class="card">
-    <b>${good.length} תמונות נשמרו בגלריה</b>
-    <div style="font-size:12px;color:var(--muted)">תיקייה: ${esc(r.folder)}</div>
-    ${bad.length ? `<div style="font-size:13px;color:var(--bad);margin-top:6px">לא צולמו: ${bad.map((x) => `#${esc(x.id)} (${esc(x.error)})`).join(', ')}</div>` : ''}
-    <div class="thumbs">${good.map((x) => `<img src="${x.thumb}" alt="פנייה ${esc(x.id)}">`).join('')}</div>
-    ${good.length ? '<div class="row-btns"><button class="btn block" id="wkShareSnaps">שיתוף כל התמונות</button></div>' : ''}
-  </div>`;
-  const sb = $('wkShareSnaps');
-  if (sb) sb.onclick = () => native('shareImages').catch((e) => toast(e.error || 'שגיאה'));
+  let bin = ''; for (let i = 0; i < data.length; i += 0x8000) bin += String.fromCharCode.apply(null, data.subarray(i, i + 0x8000));
+  return kind + '=' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+async function openExport({ withChart, withCases }) {
+  const w = wk.weeks[wk.week];
+  const cases = withCases ? wk.cases.filter((c) => wk.sel.has(c.id)).map((c) => ({
+    id: c.id, subject: c.subject, subjectRaw: c.subjectRaw, address: c.address, opened: c.opened, due: c.due,
+    files: c.files, status: c.status, statusColor: c.statusColor, description: c.description,
+  })) : [];
+  const payload = { title: `סיכום שבועי ${dm(w.from)}–${dm(w.to)}`, label: `${dm(w.from)}-${dm(w.to)}`, cases };
+  if (withChart) { const c = chartImageSvg(); payload.chart = { svg: c.svg, w: c.W, h: c.H }; }
+  const a = document.createElement('a');
+  a.href = EXPORT_URL + '#' + await packPayload(payload);
+  a.target = '_top';
+  document.body.appendChild(a); a.click(); a.remove();
+  toast('התמונות נפתחות ב-Chrome…', 3000);
+}
+function saveChart() { openExport({ withChart: true, withCases: false }).catch(() => toast('פתיחה נכשלה')); }
+$('wkSnap').onclick = () => {
+  if (!wk.sel.size) return;
+  openExport({ withChart: true, withCases: true }).catch(() => toast('פתיחה נכשלה'));
+};
+function renderSnapResults() {}
 
 /* ---------- settings ---------- */
 function fmtTime(ms) {
