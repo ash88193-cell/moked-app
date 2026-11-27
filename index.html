@@ -296,7 +296,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-27.1';
+const APP_VERSION = '2026-11-27.2';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -802,11 +802,11 @@ function barSvg(rows, series, { width = 340, height = 170, fmt = (v) => v, ref =
   const plotH = height - padT - padB, gw = (width - padX * 2) / Math.max(rows.length, 1);
   const bw = Math.min(28, (gw * 0.7) / series.length);
   const y = (v) => padT + plotH - (v / max) * plotH;
-  let s = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, Arial, sans-serif" direction="rtl">`;
+  let s = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, Arial, sans-serif">`;
   s += `<line x1="${padX}" x2="${width - padX}" y1="${y(0)}" y2="${y(0)}" stroke="#C9D0D6" stroke-width="1"/>`;
   if (ref != null) {
     s += `<line x1="${padX}" x2="${width - padX}" y1="${y(ref)}" y2="${y(ref)}" stroke="#D64545" stroke-width="1" stroke-dasharray="4 3"/>`;
-    s += `<text x="${width - padX}" y="${y(ref) - 4}" font-size="10" fill="#66707C" text-anchor="end">${fmt(ref)} = חריגה</text>`;
+    s += `<text x="${width - padX}" y="${y(ref) - 4}" font-size="10" fill="#66707C" direction="rtl" text-anchor="start">${fmt(ref)} = חריגה</text>`;
   }
   rows.forEach((r, gi) => {
     // Newest week on the left (time reads right-to-left in Hebrew).
@@ -930,8 +930,8 @@ function chartImageSvg() {
   const tableTop = 30 + 60 + 340 + 50 + 340 + 30;
   const H = tableTop + 40 + rows.length * 30 + 30;
   const inner = (svg, x, y) => svg.replace('<svg ', `<svg x="${x}" y="${y}" width="${W - 40}" height="${(W - 40) * 170 / 340}" `);
-  const t = (x, y, s, size = 18, extra = '') => `<text x="${x}" y="${y}" font-size="${size}" text-anchor="end" ${extra}>${esc(s)}</text>`;
-  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="system-ui, Arial, sans-serif" direction="rtl">`;
+  const t = (x, y, s, size = 18, extra = '') => `<text x="${x}" y="${y}" font-size="${size}" direction="rtl" text-anchor="start" ${extra}>${esc(s)}</text>`;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="system-ui, Arial, sans-serif">`;
   s += `<rect width="${W}" height="${H}" fill="#fff"/>`;
   s += t(W - 20, 44, 'סיכום שבועי – פניות מוקד', 26, 'font-weight="700" fill="#0F4C5C"');
   s += t(W - 20, 72, `שבוע = שישי 12:00 עד שישי 12:00 · הופק ${fmtTime(Date.now())}`, 14, 'fill="#66707C"');
