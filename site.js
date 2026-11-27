@@ -4,7 +4,7 @@
   if (window.__moked) return;
 
   // Bump on every change: an open site page swaps itself to a newer published copy.
-  const VERSION = '2026-11-27.4';
+  const VERSION = '2026-11-27.5';
   const SELF_URL = 'https://ash88193-cell.github.io/moked-app/site.js';
   let checkedAt = 0;
 
@@ -368,6 +368,10 @@
       else if (/^(phone|fname|lname|description|home|dateStart|dateEnd|dateStart_close|dateEnd_close)$/.test(k)) body.set(k, '');
     }
     body.set('num', id);
+    // Let the page's own first list load finish, so it does not overwrite ours; and point the
+    // page's own search at this case too (its "load more" uses the form).
+    for (let i = 0; i < 40 && !area.querySelector('#total_applications'); i++) await sleep(200);
+    if (form.elements['num']) form.elements['num'].value = id;
     const html = await getHtml(ITEMS_URL + '?time=' + Date.now(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' },
