@@ -119,6 +119,25 @@
   .spinner { width: 28px; height: 28px; border: 3px solid #D8E2E6; border-top-color: var(--brand); border-radius: 50%;
     animation: spin .8s linear infinite; margin: 0 auto 10px; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* weekly summary */
+  .wk-legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); margin: 2px 0 4px; }
+  .wk-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-left: 5px; vertical-align: -1px; }
+  .wk-tip { font-size: 13px; color: var(--text); min-height: 18px; margin-top: 2px; }
+  .wk-chart svg { width: 100%; height: auto; display: block; }
+  .wk-chart g[data-i] { cursor: pointer; }
+  .wk-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  .wk-table th, .wk-table td { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: center; }
+  .wk-table th { color: var(--muted); font-weight: 600; }
+  .wk-table td:first-child, .wk-table th:first-child { text-align: right; }
+  .wk-case { display: flex; gap: 10px; align-items: flex-start; }
+  .wk-case .body { flex: 1; min-width: 0; }
+  .wk-tag { font-size: 11px; border-radius: 6px; padding: 1px 6px; background: #EEF1F3; color: var(--muted); }
+  .wk-tag.closed { background: #E3F4EA; color: #1C6B3D; }
+  .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+  .thumbs img { width: 100%; aspect-ratio: 9/16; object-fit: cover; object-position: top; border-radius: 8px; border: 1px solid var(--line); }
+  .progress { height: 6px; background: #EEF1F3; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+  .progress i { display: block; height: 100%; background: var(--brand-2); transition: width .3s; }
+
   .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: #222; color: #fff;
     padding: 10px 16px; border-radius: 10px; z-index: 20; font-size: 14px; max-width: 90vw; text-align: center; }
 </style>
@@ -148,6 +167,7 @@
   <header>
     <div class="row">
       <h1>פניות מוקד</h1>
+      <button class="icon-btn" id="weeklyBtn" title="סיכום שבועי">📊</button>
       <button class="icon-btn" id="refreshBtn" title="רענון">⟳</button>
       <button class="icon-btn" id="settingsBtn" title="הגדרות">⚙</button>
     </div>
@@ -191,6 +211,24 @@
 
   <div class="bottom">
     <button class="btn wa" id="shareBtn">שיתוף לוואטסאפ</button>
+  </div>
+</section>
+
+<!-- weekly summary -->
+<section id="weekly" class="hidden">
+  <header>
+    <div class="row">
+      <button class="icon-btn" id="wkBack" title="חזרה">→</button>
+      <h1>סיכום שבועי</h1>
+      <button class="icon-btn" id="wkRefresh" title="רענון">⟳</button>
+    </div>
+    <div class="sub">שבוע = שישי 12:00 עד שישי 12:00</div>
+  </header>
+  <main>
+    <div id="wkBody"><div class="loading"><div class="spinner"></div>טוען נתונים…</div></div>
+  </main>
+  <div class="bottom hidden" id="wkBottom">
+    <button class="btn" id="wkSnap">צילום פניות</button>
   </div>
 </section>
 
@@ -258,7 +296,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-19.6';
+const APP_VERSION = '2026-11-27.1';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -285,7 +323,7 @@ const lastSunday = () => { const d = new Date(); d.setDate(d.getDate() - d.getDa
 const cleanAddr = (a) => (a || '').replace(/,\s*[^,()]*-{2,}[^,()]*/g, '').replace(/\s*\(/, ' (').trim();
 
 function show(view) {
-  for (const v of ['splash', 'login', 'app']) $(v).classList.toggle('hidden', v !== view);
+  for (const v of ['splash', 'login', 'app', 'weekly']) $(v).classList.toggle('hidden', v !== view);
 }
 
 /* ---------- state ---------- */
@@ -696,10 +734,279 @@ $('shareSheet').querySelectorAll('[data-img]').forEach((b) => b.onclick = () => 
 $('copyBtn').onclick = () => native('copy', { text: $('preview').value }).then(() => toast('הטקסט הועתק'));
 
 window.onBack = () => {
+  if (!$('weekly').classList.contains('hidden')) { if (!wk.busy) closeWeekly(); return true; }
   if (['shareSheet', 'setSheet', 'closeSheet'].some((id) => !$(id).classList.contains('hidden'))) { closeSheets(); return true; }
   if (!$('adv').classList.contains('hidden')) { $('adv').classList.add('hidden'); return true; }
   return false;
 };
+
+/* ---------- weekly summary ---------- */
+// Weeks run Friday 12:00 -> Friday 12:00, starting from the week the project began.
+const PROJECT_START = new Date(2026, 10, 13, 12, 0, 0).getTime();
+const WEEK = 7 * 864e5;
+const C_OPEN = '#2a78d6', C_CLOSED = '#eb6834', C_SLA = '#16697A';
+const wk = { data: null, weeks: [], week: -1, sel: new Set(), results: null, busy: false, tip: {} };
+
+const dm = (ms) => { const d = new Date(ms); return d.getDate() + '.' + (d.getMonth() + 1); };
+const weekLabel = (w) => `${dm(w.from)}–${dm(w.to)}${w.partial ? ' (עד עכשיו)' : ''}`;
+function weeksUntil(now) {
+  const out = [];
+  for (let t = PROJECT_START; t < now; t += WEEK) out.push({ from: t, to: Math.min(t + WEEK, now), partial: t + WEEK > now });
+  return out;
+}
+
+function openWeekly() { show('weekly'); window.scrollTo(0, 0); if (!wk.data) loadWeekly(); else renderWeekly(); }
+function closeWeekly() { show('app'); }
+$('weeklyBtn').onclick = openWeekly;
+$('wkBack').onclick = () => { if (!wk.busy) closeWeekly(); };
+$('wkRefresh').onclick = () => { if (!wk.busy) loadWeekly(); };
+
+async function loadWeekly() {
+  const now = Date.now();
+  $('wkBottom').classList.add('hidden');
+  $('wkBody').innerHTML = '<div class="loading"><div class="spinner"></div>טוען פניות מאז 13.11…<br><small>בפעם הראשונה זה לוקח יותר זמן (נבדק מועד הסגירה של כל פנייה)</small></div>';
+  try {
+    const d = await native('weekly', { from: PROJECT_START, to: now });
+    if (!d || !d.closed) throw { error: 'צריך לעדכן את האפליקציה' };
+    wk.data = d;
+    wk.weeks = weeksUntil(d.to).map((w) => {
+      const inW = (t) => t >= w.from && t < w.to;
+      const closed = d.closed.filter((i) => inW(i.closedAt));
+      const sl = closed.map((i) => i.sla).filter((v) => v != null);
+      return Object.assign(w, {
+        opened: d.opened.filter((i) => inW(i.openedAt)), closed,
+        slaAvg: sl.length ? Math.round(sl.reduce((a, b) => a + b, 0) / sl.length) : null, slaN: sl.length,
+      });
+    });
+    // Default: the last full week (the one that ended on the latest Friday 12:00).
+    const full = wk.weeks.filter((w) => !w.partial);
+    pickWeek(wk.weeks.indexOf(full.length ? full[full.length - 1] : wk.weeks[wk.weeks.length - 1]));
+  } catch (e) {
+    if (e.auth) { toast('החיבור למערכת פג – מתחבר מחדש…'); entered = false; return start(); }
+    const msg = /unknown method/.test(e.error || '') ? 'צריך להתקין את הגרסה החדשה של האפליקציה (APK)' : 'שגיאה בטעינה: ' + (e.error || '');
+    $('wkBody').innerHTML = `<div class="empty">${esc(msg)}<br><br><button class="btn light" onclick="loadWeekly()">נסה שוב</button></div>`;
+  }
+}
+
+function pickWeek(i) {
+  wk.week = i; wk.results = null;
+  const w = wk.weeks[i];
+  wk.sel = new Set(w.closed.map((c) => c.id)); // closed cases are chosen by default
+  renderWeekly();
+}
+
+/* Grouped bars, one value axis starting at 0. series: [{name, color}], rows: [{label, values}] */
+function barSvg(rows, series, { width = 340, height = 170, fmt = (v) => v, ref = null, id }) {
+  const padT = 18, padB = 26, padX = 6;
+  const max = Math.max(1, ref || 0, ...rows.flatMap((r) => r.values.filter((v) => v != null))) * 1.12;
+  const plotH = height - padT - padB, gw = (width - padX * 2) / Math.max(rows.length, 1);
+  const bw = Math.min(28, (gw * 0.7) / series.length);
+  const y = (v) => padT + plotH - (v / max) * plotH;
+  let s = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, Arial, sans-serif" direction="rtl">`;
+  s += `<line x1="${padX}" x2="${width - padX}" y1="${y(0)}" y2="${y(0)}" stroke="#C9D0D6" stroke-width="1"/>`;
+  if (ref != null) {
+    s += `<line x1="${padX}" x2="${width - padX}" y1="${y(ref)}" y2="${y(ref)}" stroke="#D64545" stroke-width="1" stroke-dasharray="4 3"/>`;
+    s += `<text x="${width - padX}" y="${y(ref) - 4}" font-size="10" fill="#66707C" text-anchor="end">${fmt(ref)} = חריגה</text>`;
+  }
+  rows.forEach((r, gi) => {
+    // Newest week on the left (time reads right-to-left in Hebrew).
+    const gx = width - padX - gw * (gi + 1);
+    const total = bw * series.length + 2 * (series.length - 1);
+    s += `<g data-i="${gi}"${id ? ` data-c="${id}"` : ''}><rect x="${gx}" y="0" width="${gw}" height="${height}" fill="transparent"/>`;
+    r.values.forEach((v, si) => {
+      const x = gx + (gw - total) / 2 + (series.length - 1 - si) * (bw + 2);
+      if (v == null) { s += `<text x="${x + bw / 2}" y="${y(0) - 4}" font-size="11" fill="#66707C" text-anchor="middle">–</text>`; return; }
+      const h = Math.max(1, y(0) - y(v)), r4 = Math.min(4, h / 2, bw / 2);
+      const top = y(0) - h;
+      s += `<path d="M${x},${y(0)} V${top + r4} Q${x},${top} ${x + r4},${top} H${x + bw - r4} Q${x + bw},${top} ${x + bw},${top + r4} V${y(0)} Z" fill="${series[si].color}"/>`;
+      s += `<text x="${x + bw / 2}" y="${top - 4}" font-size="11" font-weight="600" fill="#1B2430" text-anchor="middle">${fmt(v)}</text>`;
+    });
+    s += `<text x="${gx + gw / 2}" y="${height - 8}" font-size="11" fill="#66707C" text-anchor="middle">${esc(r.label)}</text></g>`;
+  });
+  return s + '</svg>';
+}
+
+function chartsFor(width) {
+  const rows = wk.weeks.map((w) => ({ w, label: dm(w.from) + '–' + dm(w.to) + (w.partial ? '*' : '') }));
+  return {
+    flow: barSvg(rows.map((r) => ({ label: r.label, values: [r.w.opened.length, r.w.closed.length] })),
+      [{ name: 'נפתחו', color: C_OPEN }, { name: 'נסגרו', color: C_CLOSED }], { width, id: 'flow' }),
+    sla: barSvg(rows.map((r) => ({ label: r.label, values: [r.w.slaAvg] })),
+      [{ name: 'SLA', color: C_SLA }], { width, fmt: (v) => v + '%', ref: 100, id: 'sla' }),
+  };
+}
+
+function weekTip(c, i) {
+  const w = wk.weeks[i];
+  return c === 'flow'
+    ? `${weekLabel(w)}: נפתחו ${w.opened.length} · נסגרו ${w.closed.length}`
+    : `${weekLabel(w)}: ${w.slaAvg == null ? 'אין נתון' : `בממוצע נוצלו ${w.slaAvg}% מזמן ה-SLA`} (${w.slaN} פניות)`;
+}
+
+function renderWeekly() {
+  const w = wk.weeks[wk.week];
+  if (!w) return;
+  const ch = chartsFor(340);
+  const byId = new Map();
+  w.opened.forEach((c) => byId.set(c.id, Object.assign({}, c, { isOpened: true })));
+  w.closed.forEach((c) => byId.set(c.id, Object.assign(byId.get(c.id) || {}, c, { isClosed: true })));
+  const cases = [...byId.values()].sort((a, b) => (!!b.isClosed - !!a.isClosed) || (b.openedAt || 0) - (a.openedAt || 0));
+  wk.cases = cases;
+  const d = wk.data;
+  $('wkBody').innerHTML = `
+    <div class="card">
+      <h3 style="margin:0 0 2px;font-size:16px">נפתחו מול נסגרו</h3>
+      <div class="wk-legend"><span><i style="background:${C_OPEN}"></i>נפתחו</span><span><i style="background:${C_CLOSED}"></i>נסגרו</span></div>
+      <div class="wk-chart">${ch.flow}</div>
+      <div class="wk-tip" id="tip-flow">${esc(wk.tip.flow || 'לחיצה על שבוע מציגה פירוט')}</div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 2px;font-size:16px">מדד SLA ממוצע בסגירה</h3>
+      <div style="font-size:12px;color:var(--muted)">כמה אחוז מהזמן הקצוב נוצל בממוצע עד הסגירה. נמוך = טוב.</div>
+      <div class="wk-chart">${ch.sla}</div>
+      <div class="wk-tip" id="tip-sla">${esc(wk.tip.sla || '')}</div>
+      <table class="wk-table">
+        <tr><th>שבוע</th><th>נפתחו</th><th>נסגרו</th><th>SLA ממוצע</th></tr>
+        ${[...wk.weeks].reverse().map((x) => `<tr><td>${esc(weekLabel(x))}</td><td>${x.opened.length}</td><td>${x.closed.length}</td>
+          <td>${x.slaAvg == null ? '–' : x.slaAvg + '%'}</td></tr>`).join('')}
+      </table>
+      ${d.noCloseTime ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">${d.noCloseTime} פניות סגורות בלי מועד סגירה בדף – לא נספרו</div>` : ''}
+      ${d.truncated ? `<div style="font-size:12px;color:var(--bad);margin-top:6px">לא כל הפניות נטענו – המספרים חלקיים</div>` : ''}
+      <div class="row-btns">
+        <button class="btn light" id="wkSaveChart">💾 שמירה כתמונה</button>
+        <button class="btn light" id="wkShareChart">שיתוף התמונה</button>
+      </div>
+    </div>
+
+    <h3 style="margin:16px 0 8px;font-size:16px">צילומי פניות</h3>
+    <div class="toggles">${wk.weeks.map((x, i) => `<button class="tg ${i === wk.week ? 'on' : ''}" data-w="${i}">${esc(weekLabel(x))}</button>`).reverse().join('')}</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <span style="font-size:13px;color:var(--muted);flex:1">${cases.length} פניות בשבוע · נבחרו <b id="wkSelN">${wk.sel.size}</b></span>
+      <button class="tg" id="wkAll">סמן הכל</button><button class="tg" id="wkNone">נקה</button>
+    </div>
+    <div id="wkResults"></div>
+    ${cases.length ? cases.map((c) => `
+      <label class="card wk-case">
+        <input type="checkbox" class="sel" data-id="${esc(c.id)}" ${wk.sel.has(c.id) ? 'checked' : ''}>
+        <div class="body">
+          <div class="subj" style="font-weight:700">${esc(c.subject || 'ללא נושא')}</div>
+          <div class="addr" style="color:var(--brand-2);font-size:14px;margin-top:2px">📍 ${esc(cleanAddr(c.address) || 'ללא כתובת')}</div>
+          <div class="meta">
+            <span class="status" style="background:${esc(c.statusColor || '#64AFFA')}">${esc(c.status || '')}</span>
+            <span>#${esc(c.id)}</span>
+            ${c.isOpened ? '<span class="wk-tag">נפתחה בשבוע</span>' : ''}
+            ${c.isClosed ? `<span class="wk-tag closed">נסגרה ${esc(fmtTime(c.closedAt))}</span>` : ''}
+            ${c.isClosed && c.sla != null ? `<span>SLA ${Math.round(c.sla)}%</span>` : ''}
+          </div>
+        </div>
+      </label>`).join('') : '<div class="empty">אין פניות בשבוע הזה</div>'}`;
+
+  $('wkBody').querySelectorAll('.wk-chart g[data-i]').forEach((g) => g.onclick = () => {
+    const c = g.dataset.c; wk.tip[c] = weekTip(c, +g.dataset.i); $('tip-' + c).textContent = wk.tip[c];
+  });
+  $('wkBody').querySelectorAll('[data-w]').forEach((b) => b.onclick = () => { if (!wk.busy) pickWeek(+b.dataset.w); });
+  $('wkBody').querySelectorAll('input.sel').forEach((cb) => cb.onchange = () => {
+    cb.checked ? wk.sel.add(cb.dataset.id) : wk.sel.delete(cb.dataset.id); updateWkSel();
+  });
+  $('wkAll').onclick = () => { cases.forEach((c) => wk.sel.add(c.id)); renderWeekly(); };
+  $('wkNone').onclick = () => { wk.sel.clear(); renderWeekly(); };
+  $('wkSaveChart').onclick = () => saveChart(false);
+  $('wkShareChart').onclick = () => saveChart(true);
+  renderSnapResults();
+  updateWkSel();
+  $('wkBottom').classList.remove('hidden');
+}
+
+function updateWkSel() {
+  $('wkSelN') && ($('wkSelN').textContent = wk.sel.size);
+  if (!wk.busy) $('wkSnap').textContent = wk.sel.size ? `📷 צילום ${wk.sel.size} פניות` : 'בחר פניות לצילום';
+  $('wkSnap').disabled = wk.busy || !wk.sel.size;
+}
+
+/* The two charts + the table as one picture (PNG), made on a canvas from an SVG. */
+function chartImageSvg() {
+  const W = 720, ch = chartsFor(340);
+  const rows = [...wk.weeks].reverse();
+  const tableTop = 30 + 60 + 340 + 50 + 340 + 30;
+  const H = tableTop + 40 + rows.length * 30 + 30;
+  const inner = (svg, x, y) => svg.replace('<svg ', `<svg x="${x}" y="${y}" width="${W - 40}" height="${(W - 40) * 170 / 340}" `);
+  const t = (x, y, s, size = 18, extra = '') => `<text x="${x}" y="${y}" font-size="${size}" text-anchor="end" ${extra}>${esc(s)}</text>`;
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="system-ui, Arial, sans-serif" direction="rtl">`;
+  s += `<rect width="${W}" height="${H}" fill="#fff"/>`;
+  s += t(W - 20, 44, 'סיכום שבועי – פניות מוקד', 26, 'font-weight="700" fill="#0F4C5C"');
+  s += t(W - 20, 72, `שבוע = שישי 12:00 עד שישי 12:00 · הופק ${fmtTime(Date.now())}`, 14, 'fill="#66707C"');
+  s += t(W - 20, 118, 'נפתחו מול נסגרו', 20, 'font-weight="700" fill="#1B2430"');
+  s += `<rect x="${W - 92}" y="128" width="12" height="12" rx="3" fill="${C_OPEN}"/>` + t(W - 98, 139, 'נפתחו', 14, 'fill="#66707C"');
+  s += `<rect x="${W - 182}" y="128" width="12" height="12" rx="3" fill="${C_CLOSED}"/>` + t(W - 188, 139, 'נסגרו', 14, 'fill="#66707C"');
+  s += inner(ch.flow, 20, 150);
+  s += t(W - 20, 150 + 340 + 40, 'מדד SLA ממוצע בסגירה (נמוך = טוב)', 20, 'font-weight="700" fill="#1B2430"');
+  s += inner(ch.sla, 20, 150 + 340 + 56);
+  const cols = [W - 20, 300, 190, 80];
+  s += ['שבוע', 'נפתחו', 'נסגרו', 'SLA ממוצע'].map((h, i) => t(cols[i], tableTop + 20, h, 15, 'fill="#66707C" font-weight="600"')).join('');
+  rows.forEach((x, i) => {
+    const y = tableTop + 52 + i * 30;
+    s += `<line x1="20" x2="${W - 20}" y1="${y - 21}" y2="${y - 21}" stroke="#E3E7EB"/>`;
+    s += [weekLabel(x), x.opened.length, x.closed.length, x.slaAvg == null ? '–' : x.slaAvg + '%']
+      .map((v, j) => t(cols[j], y, v, 16, 'fill="#1B2430"')).join('');
+  });
+  return { svg: s + '</svg>', W, H };
+}
+
+async function saveChart(share) {
+  try {
+    const { svg, W, H } = chartImageSvg();
+    const img = new Image();
+    await new Promise((ok, bad) => { img.onload = ok; img.onerror = () => bad({ error: 'יצירת התמונה נכשלה' });
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+    const cv = document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2;
+    const g = cv.getContext('2d'); g.scale(2, 2); g.drawImage(img, 0, 0);
+    const last = wk.weeks[wk.weeks.length - 1];
+    const r = await native('saveImage', { dataUrl: cv.toDataURL('image/png'), name: `סיכום_שבועי_${dm(last.to)}_${Date.now() % 100000}.png`, share });
+    if (!r) return toast('שמירה זמינה רק בטלפון');
+    if (!share) toast(`נשמר בגלריה: ${r.folder}`);
+  } catch (e) { toast(e.error === 'unknown method saveImage' ? 'צריך להתקין את הגרסה החדשה של האפליקציה' : (e.error || 'השמירה נכשלה'), 4000); }
+}
+
+/* Photos of the chosen cases: each case page in phone layout, name and phone hidden. */
+window.onSnapProgress = (i, n) => {
+  const el = $('wkProg'); if (!el) return;
+  el.querySelector('i').style.width = Math.round((i - 1) / n * 100) + '%';
+  $('wkProgTxt').textContent = `מצלם פנייה ${i} מתוך ${n}…`;
+};
+$('wkSnap').onclick = async () => {
+  const w = wk.weeks[wk.week];
+  const items = wk.cases.filter((c) => wk.sel.has(c.id)).map((c) => ({ id: c.id, name: c.name || '', phone: c.phone || '' }));
+  if (!items.length || wk.busy) return;
+  wk.busy = true; updateWkSel(); $('wkSnap').textContent = 'מצלם…';
+  $('wkResults').innerHTML = `<div class="card"><div id="wkProgTxt">מתחיל…</div><div class="progress" id="wkProg"><i style="width:0"></i></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">כל פנייה נפתחת באתר לקריאה בלבד ומצולמת. שם וטלפון הפונה מוסתרים.</div></div>`;
+  $('wkResults').scrollIntoView({ block: 'start' });
+  try {
+    const r = await native('snapCases', { items, label: `${dm(w.from)}-${dm(w.to)}` });
+    if (!r) { wk.results = null; toast('צילום זמין רק בטלפון'); }
+    else wk.results = r;
+  } catch (e) {
+    if (e.auth) { wk.busy = false; toast('החיבור למערכת פג – מתחבר מחדש…'); entered = false; return start(); }
+    toast(e.error === 'unknown method snapCases' ? 'צריך להתקין את הגרסה החדשה של האפליקציה' : (e.error || 'הצילום נכשל'), 4000);
+  } finally {
+    wk.busy = false; updateWkSel(); renderSnapResults();
+  }
+};
+function renderSnapResults() {
+  const r = wk.results, box = $('wkResults');
+  if (!box) return;
+  if (!r) { box.innerHTML = ''; return; }
+  const good = r.items.filter((x) => x.ok), bad = r.items.filter((x) => !x.ok);
+  box.innerHTML = `<div class="card">
+    <b>${good.length} תמונות נשמרו בגלריה</b>
+    <div style="font-size:12px;color:var(--muted)">תיקייה: ${esc(r.folder)}</div>
+    ${bad.length ? `<div style="font-size:13px;color:var(--bad);margin-top:6px">לא צולמו: ${bad.map((x) => `#${esc(x.id)} (${esc(x.error)})`).join(', ')}</div>` : ''}
+    <div class="thumbs">${good.map((x) => `<img src="${x.thumb}" alt="פנייה ${esc(x.id)}">`).join('')}</div>
+    ${good.length ? '<div class="row-btns"><button class="btn block" id="wkShareSnaps">שיתוף כל התמונות</button></div>' : ''}
+  </div>`;
+  const sb = $('wkShareSnaps');
+  if (sb) sb.onclick = () => native('shareImages').catch((e) => toast(e.error || 'שגיאה'));
+}
 
 /* ---------- settings ---------- */
 function fmtTime(ms) {

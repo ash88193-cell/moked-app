@@ -19,7 +19,7 @@
     try {
       let data = null;
       switch (method) {
-        case 'list': case 'detail': case 'options':
+        case 'list': case 'detail': case 'options': case 'weekly':
           data = await window.__moked[method](method === 'detail' ? a.id || a : a); break;
         case 'start':
           data = { loggedIn: window.__moked.status().loggedIn, needsUser: false, savedUser: 'בדיקה' }; break;

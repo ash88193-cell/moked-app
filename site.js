@@ -4,7 +4,7 @@
   if (window.__moked) return;
 
   // Bump on every change: an open site page swaps itself to a newer published copy.
-  const VERSION = '2026-11-19.1';
+  const VERSION = '2026-11-27.1';
   const SELF_URL = 'https://ash88193-cell.github.io/moked-app/site.js';
   let checkedAt = 0;
 
@@ -217,6 +217,120 @@
     }
   }
 
+  // Weekly summary: everything opened and everything closed between two times (ms).
+  // Every closed case gets its close time (case page, cached) and its SLA share at closing.
+  const isoDay = (ms) => { const d = new Date(ms); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const KEEP = ['id', 'subject', 'address', 'status', 'statusColor', 'opened', 'due', 'sla', 'name', 'phone', 'closedAt'];
+  const slim = (it) => { const o = {}; KEEP.forEach((k) => { if (it[k] != null) o[k] = it[k]; }); o.openedAt = parseDate(it.opened); return o; };
+  async function weekly(a) {
+    const from = +a.from, to = +(a.to || Date.now());
+    const end = isoDay(to + 864e5); // the site's end date may be exclusive
+    const closedRes = await list({ status: ['-2'], dateStart_close: isoDay(from), dateEnd_close: end, maxPages: 80 });
+    const openedRes = await list({ status: [], dateStart: isoDay(from), dateEnd: end, maxPages: 80 });
+    const todo = closedRes.items.filter((it) => !it.closedAt);
+    for (let i = 0; i < todo.length; i += 4) {
+      await Promise.all(todo.slice(i, i + 4).map(async (it) => {
+        try {
+          const c = parseDate(await closeTime(it.id));
+          if (!c) return;
+          it.closedAt = c;
+          const o = parseDate(it.opened), d = parseDate(it.due);
+          if (o && d && d > o) it.sla = Math.round(((c - o) / (d - o)) * 100);
+        } catch (e) { if (e instanceof AuthError) throw e; }
+      }));
+    }
+    const closed = closedRes.items.filter((it) => it.closedAt && it.closedAt >= from && it.closedAt < to).map(slim);
+    const opened = openedRes.items.map(slim).filter((it) => it.openedAt && it.openedAt >= from && it.openedAt < to);
+    return {
+      from, to, closed, opened,
+      noCloseTime: closedRes.items.filter((it) => !it.closedAt).length,
+      truncated: closedRes.truncated || openedRes.truncated,
+    };
+  }
+
+  // Hides the resident's details on the page about to be photographed: the text itself is
+  // replaced (so nothing can be recovered from the image) and the spot is blurred.
+  // Synchronous; returns how many places were hidden.
+  function mask(a) {
+    a = a || {};
+    const LETTER = 'A-Za-z֐-׿';
+    const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const parts = [];
+    const name = clean(a.name);
+    if (name) {
+      parts.push(escRe(name).replace(/ /g, '\\s+'));
+      const w = name.split(' ');
+      if (w.length > 1) parts.push(escRe([...w].reverse().join(' ')).replace(/ /g, '\\s+'));
+    }
+    const digits = String(a.phone || '').replace(/\D/g, '').replace(/^972/, '0');
+    if (digits.length >= 7) parts.push(digits.split('').map(escRe).join('[\\s\\-]?'));
+    // Any Israeli phone number, with or without dashes / +972.
+    parts.push('(?:\\+?972[\\s\\-]?|0)(?:5\\d|7\\d|[23489])[\\s\\-]?\\d{3}[\\s\\-]?\\d{4}');
+    const re = new RegExp('(?<![' + LETTER + '0-9])(?:' + parts.join('|') + ')(?![' + LETTER + '0-9])', 'g');
+    const dots = (s) => s.replace(/\S/g, '●');
+
+    if (!document.getElementById('__mkStyle')) {
+      const st = document.createElement('style');
+      st.id = '__mkStyle';
+      st.textContent = '.__mk{filter:blur(5px)!important;-webkit-user-select:none}';
+      (document.head || document.documentElement).appendChild(st);
+    }
+    let n = 0;
+    const hide = (el) => { if (el && el.nodeType === 1 && !el.classList.contains('__mk')) { el.classList.add('__mk'); n++; } };
+    const hideText = (el) => {
+      if (!el) return;
+      const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let t; (t = w.nextNode());) t.nodeValue = dots(t.nodeValue);
+      hide(el);
+    };
+
+    // 1. The name / phone wherever it appears in the text.
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const hits = [];
+    for (let t; (t = walker.nextNode());) {
+      const p = t.parentElement;
+      if (!p || /^(SCRIPT|STYLE|NOSCRIPT)$/.test(p.tagName)) continue;
+      re.lastIndex = 0;
+      if (re.test(t.nodeValue)) hits.push(t);
+    }
+    hits.forEach((t) => {
+      re.lastIndex = 0;
+      t.nodeValue = t.nodeValue.replace(re, dots);
+      hide(t.parentElement);
+    });
+    // 2. Phone links and form fields.
+    document.querySelectorAll('a[href^="tel:"], a[href^="mailto:"], a[href*="wa.me"], a[href*="whatsapp"]').forEach((el) => {
+      el.removeAttribute('href'); hideText(el);
+    });
+    document.querySelectorAll('input, textarea').forEach((el) => {
+      if (el.type === 'hidden' || !el.value) return;
+      re.lastIndex = 0;
+      if (re.test(el.value) || /phone|tel|mobile|fname|lname|name|email|tz/i.test(el.name + ' ' + el.id)) {
+        el.value = dots(el.value); hide(el);
+      }
+    });
+    // 3. "Label: value" pairs about the resident (name, phone, ID, e-mail).
+    const LABEL = /^(שם\s*(ה)?פונה|שם\s*פרטי|שם\s*משפחה|שם\s*מלא|טלפון(\s*\S+)?|נייד|טל['׳]?|ת\.?\s*ז\.?|תעודת\s*זהות|דוא["״]?ל|אימייל|מייל|e-?mail)\s*:?$/i;
+    document.querySelectorAll('body *').forEach((el) => {
+      if (el.children.length > 2 || el.classList.contains('__mk')) return;
+      const own = clean([...el.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join(' '));
+      const all = clean(el.textContent);
+      if (LABEL.test(all)) {
+        // The label alone: the value is the next cell / element.
+        let v = el.nextElementSibling;
+        if (!v && el.parentElement && el.parentElement.children.length <= 3) v = el.parentElement.nextElementSibling;
+        if (v && clean(v.textContent).length < 80) hideText(v);
+        let s = el.nextSibling;
+        while (s && s.nodeType === 3 && !clean(s.nodeValue)) s = s.nextSibling;
+        if (s && s.nodeType === 3) { s.nodeValue = dots(s.nodeValue); hide(el.parentElement); }
+      } else if (own) {
+        const m = own.match(/^(שם\s*(ה)?פונה|שם\s*מלא|טלפון(\s*נייד)?|נייד|ת\.?\s*ז\.?|דוא["״]?ל)\s*:\s*(.+)$/i);
+        if (m && own.length < 80) hideText(el);
+      }
+    });
+    return n;
+  }
+
   async function detail(id) {
     const doc = parser.parseFromString(await getHtml('/ims/system/?view=custom&module=moked-page&id=' + encodeURIComponent(id)), 'text/html');
     const box = doc.querySelector('#container_description');
@@ -325,7 +439,7 @@
     }
     let out;
     try {
-      const fn = { list, detail, options, status, prepareUpdate, referral }[method];
+      const fn = { list, detail, options, status, prepareUpdate, referral, weekly }[method];
       if (!fn) throw new Error('unknown method ' + method);
       out = { ok: true, data: await fn(args) };
     } catch (e) {
@@ -336,5 +450,5 @@
     return out;
   }
 
-  window.__moked = { run, list, detail, options, status, prepareUpdate, referral, version: VERSION };
+  window.__moked = { run, list, detail, options, status, prepareUpdate, referral, weekly, mask, version: VERSION };
 })();
