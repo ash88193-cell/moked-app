@@ -300,7 +300,7 @@ if (!window.Native && /^#[zj]=/.test(location.hash)) location.replace('export.ht
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-27.7';
+const APP_VERSION = '2026-11-27.8';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -770,7 +770,7 @@ async function loadWeekly() {
   $('wkBottom').classList.add('hidden');
   $('wkBody').innerHTML = '<div class="loading"><div class="spinner"></div>טוען פניות מאז 13.11…<br><small>בפעם הראשונה זה לוקח יותר זמן (נבדק מועד הסגירה של כל פנייה)</small></div>';
   try {
-    const d = await native('weekly', { from: PROJECT_START, to: now });
+    const d = await native('list', { __weekly: { from: PROJECT_START, to: now } });
     if (!d || !d.closed) throw { error: 'צריך לעדכן את האפליקציה' };
     wk.data = d;
     wk.weeks = weeksUntil(d.to).map((w) => {

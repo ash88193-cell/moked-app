@@ -4,7 +4,7 @@
   if (window.__moked) return;
 
   // Bump on every change: an open site page swaps itself to a newer published copy.
-  const VERSION = '2026-11-27.2';
+  const VERSION = '2026-11-27.3';
   const SELF_URL = 'https://ash88193-cell.github.io/moked-app/site.js';
   let checkedAt = 0;
 
@@ -161,6 +161,8 @@
   // params: { status: [...], subSubject: [...], neighborhood: [...], dateStart, dateEnd,
   //           dateStart_close, dateEnd_close, description, num, maxPages }
   async function list(params) {
+    // The installed app only knows a few methods, so the weekly summary rides on "list".
+    if (params && params.__weekly) return weekly(params.__weekly);
     const { defaults } = await loadForm();
     const base = new URLSearchParams();
     for (const [k, v] of defaults) if (!k.endsWith('[]')) base.append(k, v);
