@@ -296,7 +296,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const SITE = 'https://afula.moked-binaa.co.il/ims/system/';
-const APP_VERSION = '2026-11-27.2';
+const APP_VERSION = '2026-11-27.3';
 
 /* ---------- native bridge ---------- */
 const pending = {}; let seq = 0;
@@ -748,7 +748,7 @@ const C_OPEN = '#2a78d6', C_CLOSED = '#eb6834', C_SLA = '#16697A';
 const wk = { data: null, weeks: [], week: -1, sel: new Set(), results: null, busy: false, tip: {} };
 
 const dm = (ms) => { const d = new Date(ms); return d.getDate() + '.' + (d.getMonth() + 1); };
-const weekLabel = (w) => `${dm(w.from)}–${dm(w.to)}${w.partial ? ' (עד עכשיו)' : ''}`;
+const weekLabel = (w) => `⁦${dm(w.from)}–${dm(w.to)}⁩${w.partial ? ' (עד עכשיו)' : ''}`;
 function weeksUntil(now) {
   const out = [];
   for (let t = PROJECT_START; t < now; t += WEEK) out.push({ from: t, to: Math.min(t + WEEK, now), partial: t + WEEK > now });
@@ -927,7 +927,7 @@ function updateWkSel() {
 function chartImageSvg() {
   const W = 720, ch = chartsFor(340);
   const rows = [...wk.weeks].reverse();
-  const tableTop = 30 + 60 + 340 + 50 + 340 + 30;
+  const tableTop = 150 + 340 + 56 + 340 + 24;
   const H = tableTop + 40 + rows.length * 30 + 30;
   const inner = (svg, x, y) => svg.replace('<svg ', `<svg x="${x}" y="${y}" width="${W - 40}" height="${(W - 40) * 170 / 340}" `);
   const t = (x, y, s, size = 18, extra = '') => `<text x="${x}" y="${y}" font-size="${size}" direction="rtl" text-anchor="start" ${extra}>${esc(s)}</text>`;
